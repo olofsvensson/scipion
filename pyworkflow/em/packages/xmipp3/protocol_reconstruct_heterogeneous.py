@@ -123,7 +123,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
                   expertLevel=LEVEL_ADVANCED, help="In pixels. The next shift is searched from the previous shift plus/minus this amount.")
         form.addParam('shiftStep5d', FloatParam, label="Shift step", default=2.0,  
 	              expertLevel=LEVEL_ADVANCED, help="In pixels")
-        form.addParam('numberOfOrientations', IntParam, default=3, label='Number of orientations',
+        form.addParam('numberOfOrientations', IntParam, default=3, label='Number of orientations', expertLevel=LEVEL_ADVANCED,
                       help="Set the number of orientations to 1 to have a pure projection matching")
 
         form.addSection(label='Weights')
@@ -401,7 +401,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
         # Calculate angular step at this resolution
         newXdim=self.readInfoField(fnGlobal,"size",MDL_XSIZE)
         angleStep=self.calculateAngStep(newXdim, TsCurrent, self.targetResolution.get())
-        angleStep=max(angleStep,3.0)
+        angleStep=max(angleStep,5.0)
         self.writeInfoField(fnGlobal,"angleStep",MDL_ANGLE_DIFF,float(angleStep))
         
         # Global alignment
@@ -424,6 +424,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
             else:
                 numberGroups=1
                 ctfPresent=False
+                fnCTFs=""
 
             # Generate projections
             fnReferenceVol=join(fnGlobal,"volumeRef%02d.vol"%i)
@@ -441,17 +442,19 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
                 if not exists(fnAnglesGroup):
                     if ctfPresent:
                         fnGroup="ctfGroup%06d@%s/ctf_groups.xmd"%(j,fnDirSignificant)                            
-                        fnGalleryGroup=fnGallery
                     else:
                         fnGroup=fnImgs
+                    fnGalleryGroup=fnGallery
                     maxShift=round(self.angularMaxShift.get()*newXdim/100)
                     R=self.particleRadius.get()
                     if R<=0:
                         R=self.inputParticles.get().getDimensions()[0]/2
                     R=R*self.TsOrig/TsCurrent
-                    args='-i %s -o %s --ref %s --ctf %d@%s --Ri 0 --Ro %d --max_shift %d --search5d_shift %d --search5d_step %f --mem 2 --append --pad 2.0 --number_of_orientations %d'%\
-                         (fnGroup,join(fnDirSignificant,"angles_group%03d.xmd"%j),fnGalleryGroup,j,fnCTFs,R,maxShift,self.shiftSearch5d.get(),self.shiftStep5d.get(),
+                    args='-i %s -o %s --ref %s --Ri 0 --Ro %d --max_shift %d --search5d_shift %d --search5d_step %f --mem 2 --append --pad 2.0 --number_orientations %d'%\
+                         (fnGroup,join(fnDirSignificant,"angles_group%03d.xmd"%j),fnGalleryGroup,R,maxShift,self.shiftSearch5d.get(),self.shiftStep5d.get(),
                           self.numberOfOrientations.get())
+                    if ctfPresent:
+                        args+=" --ctf %d@%s"%(j,fnCTFs)
                     if self.numberOfMpi>1:
                         args+=" --mpi_job_size 2"
                     self.runJob('xmipp_angular_projection_matching',args,numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
