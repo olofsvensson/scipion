@@ -74,6 +74,8 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
         form.addParam('particleRadius', IntParam, default=-1, 
                      condition='not doContinue', label='Radius of particle (px)',
                      help='This is the radius (in pixels) of the spherical mask covering the particle in the input images')       
+        form.addParam('targetResolution', FloatParam, default=8, 
+                     label='Target resolution (A)')       
 
         form.addParam('continueRun', PointerParam, pointerClass=self.getClassName(),
                       condition='doContinue', allowsNull=True,
@@ -87,15 +89,11 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
         form.addParam("saveSpace", BooleanParam, default=False, label="Remove intermediary files")
         
         form.addSection(label='Next Reference')
-        form.addParam('nextResolutionCriterion',FloatParam, label="FSC criterion", default=0.143, 
-                      help='The resolution of the reconstruction is defined as the inverse of the frequency at which '\
-                      'the FSC drops below this value. Typical values are 0.143 and 0.5')
         form.addParam('nextLowPass', BooleanParam, label="Low pass filter?", default=True,
                       help='Apply a low pass filter to the previous iteration whose maximum frequency is '\
                            'the current resolution(A) + resolutionOffset(A). If resolutionOffset>0, then fewer information' \
                            'is used (meant to avoid overfitting). If resolutionOffset<0, then more information is allowed '\
                            '(meant for a greedy convergence).')
-        form.addParam('nextResolutionOffset', FloatParam, label="Resolution offset (A)", default=2, condition='nextLowPass')
         form.addParam('nextSpherical', BooleanParam, label="Spherical mask?", default=True,
                       help='Apply a spherical mask of the size of the particle')
         form.addParam('nextPositivity', BooleanParam, label="Positivity?", default=True,
@@ -125,6 +123,8 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
                   expertLevel=LEVEL_ADVANCED, help="In pixels. The next shift is searched from the previous shift plus/minus this amount.")
         form.addParam('shiftStep5d', FloatParam, label="Shift step", default=2.0,  
 	              expertLevel=LEVEL_ADVANCED, help="In pixels")
+        form.addParam('numberOfOrientations', IntParam, default=3, label='Number of orientations',
+                      help="Set the number of orientations to 1 to have a pure projection matching")
 
         form.addSection(label='Weights')
         form.addParam('weightSSNR', BooleanParam, label="Weight by SSNR?", default=True,
@@ -159,18 +159,18 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
             self._insertFunctionStep('doIteration000', self.inputVolumes.getObjId())
             firstIteration=1
         self.TsOrig=self.inputParticles.get().getSamplingRate()
-        #for self.iteration in range(firstIteration,firstIteration+self.numberOfIterations.get()):
-        #    self.insertIteration(self.iteration)
+        for self.iteration in range(firstIteration,firstIteration+self.numberOfIterations.get()):
+            self.insertIteration(self.iteration)
         #self._insertFunctionStep("createOutput")
     
     def insertIteration(self,iteration):
         self._insertFunctionStep('globalAssignment',iteration)
-        self._insertFunctionStep('weightParticles',iteration)
-        self._insertFunctionStep('qualifyParticles',iteration)
-        self._insertFunctionStep('reconstruct',iteration)
-        self._insertFunctionStep('postProcessing',iteration)
-        self._insertFunctionStep('evaluateReconstructions',iteration)
-        self._insertFunctionStep('cleanDirectory',iteration)
+#         self._insertFunctionStep('weightParticles',iteration)
+#         self._insertFunctionStep('qualifyParticles',iteration)
+#         self._insertFunctionStep('reconstruct',iteration)
+#         self._insertFunctionStep('postProcessing',iteration)
+#         self._insertFunctionStep('evaluateReconstructions',iteration)
+#         self._insertFunctionStep('cleanDirectory',iteration)
 
     #--------------------------- STEPS functions ---------------------------------------------------
     def convertInputStep(self, inputParticlesId):
@@ -317,30 +317,15 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
             R=self.inputParticles.get().getDimensions()[0]/2
         R=min(round(R*self.TsOrig/TsCurrent*(1+self.angularMaxShift.get()*0.01)),newXdim/2)
         self.runJob("xmipp_transform_mask","-i %s --mask circular -%d"%(fnNewParticles,R),numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
-        fnSource=join(fnDir,"images.xmd")
-        if self.splitMethod==self.SPLIT_STOCHASTIC:
-            self.runJob('xmipp_metadata_utilities','-i %s --set intersection %s particleId particleId -o %s/all_images.xmd'%\
-                        (fnSource,self._getExtraPath('images.xmd'),fnDir),numberOfMpi=1)
-            self.runJob("xmipp_metadata_split","-i %s/all_images.xmd --oroot %s/images -n 2"%(fnDir,fnDir),numberOfMpi=1)
-            cleanPath("%s/all_images.xmd"%fnDir)
-            for i in range(1,3):
-                moveFile("%s/images%06d.xmd"%(fnDir,i),"%s/images%02d.xmd"%(fnDir,i))
-        else:
-            for i in range(1,3):
-                fnImagesi=join(fnDir,"images%02d.xmd"%i)
-                self.runJob('xmipp_metadata_utilities','-i %s --set intersection %s/images%02d.xmd particleId particleId -o %s'%\
-                            (fnSource,fnDir0,i,fnImagesi),numberOfMpi=1)
-        cleanPath(fnSource)
+        fnImages=join(fnDir,"images.xmd")
         
         if getShiftsFrom!="":
             fnPreviousAngles=join(getShiftsFrom,"angles.xmd")
             TsPrevious=self.readInfoField(getShiftsFrom,"sampling",MDL_SAMPLINGRATE)
             fnAux=join(fnDir,"aux.xmd")
-            for i in range(1,3):
-                fnImagesi=join(fnDir,"images%02d.xmd"%i)
-                self.runJob('xmipp_metadata_utilities','-i %s --set join %s particleId particleId -o %s'%\
-                            (fnImagesi,fnPreviousAngles,fnAux),numberOfMpi=1)
-                self.adaptShifts(fnAux, TsPrevious, fnImagesi, TsCurrent)
+            self.runJob('xmipp_metadata_utilities','-i %s --set join %s particleId particleId -o %s'%\
+                        (fnImages,fnPreviousAngles,fnAux),numberOfMpi=1)
+            self.adaptShifts(fnAux, TsPrevious, fnImages, TsCurrent)
             cleanPath(fnAux)
         
     def prepareReferences(self,fnDirPrevious,fnDir,TsCurrent,targetResolution):
@@ -351,7 +336,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
             fnMask=join(fnDir,"mask.vol")
             self.prepareMask(self.nextMask.get(), fnMask, TsCurrent, newXdim)
         TsPrevious=self.readInfoField(fnDirPrevious,"sampling",MDL_SAMPLINGRATE)
-        for i in range(1,3):
+        for i in range(1,self.numberOfClasses.get()+1):
             fnPreviousVol=join(fnDirPrevious,"volume%02d.vol"%i)
             fnReferenceVol=join(fnDir,"volumeRef%02d.vol"%i)
             if TsPrevious!=TsCurrent:
@@ -361,10 +346,9 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
                     copyFile(fnPreviousVol, fnReferenceVol)
                 else:
                     createLink(fnPreviousVol, fnReferenceVol)
-            self.runJob('xmipp_transform_filter','-i %s --fourier fsc %s --sampling %f'%(fnReferenceVol,join(fnDirPrevious,"fsc.xmd"),TsCurrent),numberOfMpi=1)
             if self.nextLowPass:
                 self.runJob('xmipp_transform_filter','-i %s --fourier low_pass %f --sampling %f'%\
-                            (fnReferenceVol,targetResolution+self.nextResolutionOffset.get(),TsCurrent),numberOfMpi=1)
+                            (fnReferenceVol,self.targetResolution.get(),TsCurrent),numberOfMpi=1)
             if self.nextSpherical:
                 R=self.particleRadius.get()
                 if R<=0:
@@ -403,91 +387,78 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
         fnDirPrevious=self._getExtraPath("Iter%03d"%(iteration-1))
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
         makePath(fnDirCurrent)
-        previousResolution=self.readInfoField(fnDirPrevious,"resolution",MDL_RESOLUTION_FREQREAL)
 
-        if self.alignmentMethod==self.GLOBAL_ALIGNMENT:
-            fnGlobal=join(fnDirCurrent,"globalAssignment")
-            makePath(fnGlobal)
-    
-            targetResolution=previousResolution*0.8
-            if self.multiresolution:
-                TsCurrent=max(self.TsOrig,targetResolution/3)
+        fnGlobal=join(fnDirCurrent,"globalAssignment")
+        makePath(fnGlobal)
+
+        TsCurrent=max(self.TsOrig,self.targetResolution.get()/3)
+        getShiftsFrom=''
+        if iteration>1:
+            getShiftsFrom=fnDirPrevious
+        self.prepareImages(fnDirPrevious,fnGlobal,TsCurrent,getShiftsFrom)
+        self.prepareReferences(fnDirPrevious,fnGlobal,TsCurrent,self.targetResolution.get())
+
+        # Calculate angular step at this resolution
+        newXdim=self.readInfoField(fnGlobal,"size",MDL_XSIZE)
+        angleStep=self.calculateAngStep(newXdim, TsCurrent, self.targetResolution.get())
+        angleStep=max(angleStep,3.0)
+        self.writeInfoField(fnGlobal,"angleStep",MDL_ANGLE_DIFF,float(angleStep))
+        
+        # Global alignment
+        fnImgs=join(fnGlobal,"images.xmd")
+        for i in range(1,self.numberOfClasses.get()+1):
+            fnDirSignificant=join(fnGlobal,"significant%02d"%i)
+            makePath(fnDirSignificant)
+
+            # Create defocus groups
+            row=getFirstRow(fnImgs)
+            if row.containsLabel(MDL_CTF_MODEL) or row.containsLabel(MDL_CTF_DEFOCUSU):
+                self.runJob("xmipp_ctf_group","--ctfdat %s -o %s/ctf:stk --pad 2.0 --sampling_rate %f --phase_flipped  --error 0.1 --resol %f"%\
+                            (fnImgs,fnDirSignificant,TsCurrent,self.targetResolution.get()),numberOfMpi=1)
+                moveFile("%s/ctf_images.sel"%fnDirSignificant,"%s/ctf_groups.xmd"%fnDirSignificant)
+                cleanPath("%s/ctf_split.doc"%fnDirSignificant)
+                md = MetaData("numberGroups@%s"%join(fnDirSignificant,"ctfInfo.xmd"))
+                fnCTFs="%s/ctf_ctf.stk"%fnDirSignificant
+                numberGroups=md.getValue(MDL_COUNT,md.firstObject())
+                ctfPresent=True
             else:
-                TsCurrent=self.TsOrig
-            getShiftsFrom=''
-            if iteration>1:
-                getShiftsFrom=fnDirPrevious
-            self.prepareImages(fnDirPrevious,fnGlobal,TsCurrent,getShiftsFrom)
-            self.prepareReferences(fnDirPrevious,fnGlobal,TsCurrent,targetResolution)
+                numberGroups=1
+                ctfPresent=False
 
-            # Calculate angular step at this resolution
-            ResolutionAlignment=previousResolution
-            if self.nextLowPass:
-                ResolutionAlignment+=self.nextResolutionOffset.get()
-            newXdim=self.readInfoField(fnGlobal,"size",MDL_XSIZE)
-            angleStep=self.calculateAngStep(newXdim, TsCurrent, ResolutionAlignment)
-            angleStep=max(angleStep,3.0)
-            self.writeInfoField(fnGlobal,"angleStep",MDL_ANGLE_DIFF,float(angleStep))
-            
-            # Global alignment
-            for i in range(1,3):
-                fnDirSignificant=join(fnGlobal,"significant%02d"%i)
-                fnImgs=join(fnGlobal,"images%02d.xmd"%i)
-                makePath(fnDirSignificant)
-
-                # Create defocus groups
-                row=getFirstRow(fnImgs)
-                if row.containsLabel(MDL_CTF_MODEL) or row.containsLabel(MDL_CTF_DEFOCUSU):
-                    self.runJob("xmipp_ctf_group","--ctfdat %s -o %s/ctf:stk --pad 2.0 --sampling_rate %f --phase_flipped  --error 0.1 --resol %f"%\
-                                (fnImgs,fnDirSignificant,TsCurrent,targetResolution),numberOfMpi=1)
-                    moveFile("%s/ctf_images.sel"%fnDirSignificant,"%s/ctf_groups.xmd"%fnDirSignificant)
-                    cleanPath("%s/ctf_split.doc"%fnDirSignificant)
-                    md = MetaData("numberGroups@%s"%join(fnDirSignificant,"ctfInfo.xmd"))
-                    fnCTFs="%s/ctf_ctf.stk"%fnDirSignificant
-                    numberGroups=md.getValue(MDL_COUNT,md.firstObject())
-                    ctfPresent=True
-                else:
-                    numberGroups=1
-                    ctfPresent=False
-
-                # Generate projections
-                fnReferenceVol=join(fnGlobal,"volumeRef%02d.vol"%i)
-                fnGallery=join(fnDirSignificant,"gallery%02d.stk"%i)
-                fnGalleryMd=join(fnDirSignificant,"gallery%02d.xmd"%i)
-                args="-i %s -o %s --sampling_rate %f --sym %s --min_tilt_angle %f --max_tilt_angle %f"%\
-                     (fnReferenceVol,fnGallery,angleStep,self.symmetryGroup,self.angularMinTilt.get(),self.angularMaxTilt.get())
-                args+=" --compute_neighbors --angular_distance -1 --experimental_images %s"%self._getExtraPath("images.xmd")
-                self.runJob("xmipp_angular_project_library",args,numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
-                cleanPath(join(fnDirSignificant,"gallery_angles%02d.doc"%i))
-                moveFile(join(fnDirSignificant,"gallery%02d.doc"%i), fnGalleryMd)
-                fnAngles=join(fnGlobal,"anglesDisc%02d.xmd"%i)
-                for j in range(1,numberGroups+1):
-                    fnAnglesGroup=join(fnDirSignificant,"angles_group%03d.xmd"%j)
-                    if not exists(fnAnglesGroup):
-                        if ctfPresent:
-                            fnGroup="ctfGroup%06d@%s/ctf_groups.xmd"%(j,fnDirSignificant)                            
-                            fnGalleryGroup=fnGallery
-                            fnGalleryGroupMd=fnGalleryMd
-                        else:
-                            fnGroup=fnImgs
-                            fnGalleryGroupMd=fnGalleryMd
-                        maxShift=round(self.angularMaxShift.get()*newXdim/100)
-                        R=self.particleRadius.get()
-                        if R<=0:
-                            R=self.inputParticles.get().getDimensions()[0]/2
-                        R=R*self.TsOrig/TsCurrent
-                        args='-i %s -o %s --ref %s --ctf %d@%s --Ri 0 --Ro %d --max_shift %d --search5d_shift %d --search5d_step %f --mem 2 --append --pad 2.0'%\
-                             (fnGroup,join(fnDirSignificant,"angles_group%03d.xmd"%j),fnGalleryGroup,j,fnCTFs,R,maxShift,self.shiftSearch5d.get(),self.shiftStep5d.get())
-                        if self.numberOfMpi>1:
-                            args+=" --mpi_job_size 2"
-                        self.runJob('xmipp_angular_projection_matching',args,numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
-                        if j==1:
-                            copyFile(fnAnglesGroup, fnAngles)
-                        else:
-                            self.runJob("xmipp_metadata_utilities","-i %s --set union %s"%(fnAngles,fnAnglesGroup),numberOfMpi=1)
-                self.runJob("xmipp_metadata_utilities","-i %s --set join %s image"%(fnAngles,fnImgs),numberOfMpi=1)
-                if self.saveSpace and ctfPresent:
-                    self.runJob("rm -f",fnDirSignificant+"/gallery*",numberOfMpi=1)
+            # Generate projections
+            fnReferenceVol=join(fnGlobal,"volumeRef%02d.vol"%i)
+            fnGallery=join(fnDirSignificant,"gallery%02d.stk"%i)
+            fnGalleryMd=join(fnDirSignificant,"gallery%02d.xmd"%i)
+            args="-i %s -o %s --sampling_rate %f --sym %s --min_tilt_angle %f --max_tilt_angle %f"%\
+                 (fnReferenceVol,fnGallery,angleStep,self.symmetryGroup,self.angularMinTilt.get(),self.angularMaxTilt.get())
+            args+=" --compute_neighbors --angular_distance -1 --experimental_images %s"%self._getExtraPath("images.xmd")
+            self.runJob("xmipp_angular_project_library",args,numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
+            cleanPath(join(fnDirSignificant,"gallery_angles%02d.doc"%i))
+            moveFile(join(fnDirSignificant,"gallery%02d.doc"%i), fnGalleryMd)
+            fnAngles=join(fnGlobal,"anglesDisc%02d.xmd"%i)
+            for j in range(1,numberGroups+1):
+                fnAnglesGroup=join(fnDirSignificant,"angles_group%03d.xmd"%j)
+                if not exists(fnAnglesGroup):
+                    if ctfPresent:
+                        fnGroup="ctfGroup%06d@%s/ctf_groups.xmd"%(j,fnDirSignificant)                            
+                        fnGalleryGroup=fnGallery
+                    else:
+                        fnGroup=fnImgs
+                    maxShift=round(self.angularMaxShift.get()*newXdim/100)
+                    R=self.particleRadius.get()
+                    if R<=0:
+                        R=self.inputParticles.get().getDimensions()[0]/2
+                    R=R*self.TsOrig/TsCurrent
+                    args='-i %s -o %s --ref %s --ctf %d@%s --Ri 0 --Ro %d --max_shift %d --search5d_shift %d --search5d_step %f --mem 2 --append --pad 2.0 --number_of_orientations %d'%\
+                         (fnGroup,join(fnDirSignificant,"angles_group%03d.xmd"%j),fnGalleryGroup,j,fnCTFs,R,maxShift,self.shiftSearch5d.get(),self.shiftStep5d.get(),
+                          self.numberOfOrientations.get())
+                    if self.numberOfMpi>1:
+                        args+=" --mpi_job_size 2"
+                    self.runJob('xmipp_angular_projection_matching',args,numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
+                    if j==1:
+                        copyFile(fnAnglesGroup, fnAngles)
+                    else:
+                        self.runJob("xmipp_metadata_utilities","-i %s --set union %s"%(fnAngles,fnAnglesGroup),numberOfMpi=1)
                 
     def adaptShifts(self, fnSource, TsSource, fnDest, TsDest):
         K=TsSource/TsDest
