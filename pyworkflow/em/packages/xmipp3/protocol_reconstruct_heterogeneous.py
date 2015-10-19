@@ -33,7 +33,7 @@ from pyworkflow.protocol.params import PointerParam, StringParam, FloatParam, Bo
 from pyworkflow.utils.path import cleanPath, makePath, copyFile, moveFile, createLink
 from pyworkflow.em.protocol import ProtClassify3D
 from pyworkflow.em.data import SetOfVolumes, Volume
-from pyworkflow.em.metadata.utils import getFirstRow
+from pyworkflow.em.metadata.utils import getFirstRow, getSize
 from convert import writeSetOfParticles
 from os.path import join, exists
 from pyworkflow.em.packages.xmipp3.convert import readSetOfParticles, setXmippAttributes
@@ -444,6 +444,8 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
                         fnGroup="ctfGroup%06d@%s/ctf_groups.xmd"%(j,fnDirSignificant)                            
                     else:
                         fnGroup=fnImgs
+                    if getSize(fnGroup)==0: # If the group is empty
+                        continue
                     fnGalleryGroup=fnGallery
                     maxShift=round(self.angularMaxShift.get()*newXdim/100)
                     R=self.particleRadius.get()
@@ -462,6 +464,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
                         copyFile(fnAnglesGroup, fnAngles)
                     else:
                         self.runJob("xmipp_metadata_utilities","-i %s --set union %s"%(fnAngles,fnAnglesGroup),numberOfMpi=1)
+                    self.runJob("rm -f",fnDirSignificant+"/gallery*",numberOfMpi=1)
                 
     def adaptShifts(self, fnSource, TsSource, fnDest, TsDest):
         K=TsSource/TsDest
@@ -675,23 +678,17 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, HelicalFinder):
 
     def cleanDirectory(self, iteration):
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
+        fnGlobal=join(fnDirCurrent,"globalAssignment")
+        for i in range(1,self.numberOfClasses.get()+1):
+            if exists(fnGlobal):
+                cleanPath(join(fnGlobal,"significant%02d"%i))
         if self.saveSpace:
-            fnGlobal=join(fnDirCurrent,"globalAssignment")
-            fnLocal=join(fnDirCurrent,"localAssignment")
             if exists(fnGlobal):
                 cleanPath(join(fnGlobal,"images.stk"))
-            for i in range(1,3):
+            for i in range(1,self.numberOfClasses.get()+1):
                 if exists(fnGlobal):
                     cleanPath(join(fnGlobal,"images%02d.xmd"%i))
                     cleanPath(join(fnGlobal,"volumeRef%02d.vol"%i))
-                if exists(fnLocal):
-                    cleanPath(join(fnLocal,"images%02d.xmd"%i))
-                    cleanPath(join(fnLocal,"anglesCont%02d.stk"%i))
-                    cleanPath(join(fnLocal,"anglesDisc%02d.xmd"%i))
-                    cleanPath(join(fnLocal,"volumeRef%02d.vol"%i))
-                    #if self.weightResiduals:
-                    #    cleanPath(join(fnLocal,"covariance%02d.stk"%i))
-                    #    cleanPath(join(fnLocal,"residuals%02i.stk"%i))
 
     #--------------------------- INFO functions --------------------------------------------
     def _validate(self):
