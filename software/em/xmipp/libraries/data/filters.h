@@ -582,6 +582,9 @@ double alignImages(const MultidimArray< double >& Iref,
                    CorrelationAux &aux2,
                    RotationalCorrelationAux &aux3);
 
+/** Adapt the gray values of I to resemble (L1-norm) Iref */
+void adaptGrayValues(const MultidimArray< double >& Iref, MultidimArray<double> &I, double maxGrayFactor, double maxGrayShift, MultidimArray<int> *mask=NULL);
+
 /** Auxiliary class for fast volume alignment */
 class VolumeAlignmentAux
 {

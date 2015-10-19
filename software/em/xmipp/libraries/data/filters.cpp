@@ -1685,6 +1685,63 @@ void alignSetOfImages(MetaData &MD, MultidimArray<double>& Iavg, int Niter,
     }
 }
 
+struct AdaptGrayValuesAux
+{
+	double maxGrayFactor;
+	double maxGrayShift;
+	MultidimArray<int> *mask;
+	MultidimArray<double> *Iref;
+	MultidimArray<double> *I;
+};
+
+double adaptGrayValuesL1(double *p, void *_prm)
+{
+	double a=p[1];
+	double b=p[2];
+
+	double e=0.0;
+	const AdaptGrayValuesAux *prm=(AdaptGrayValuesAux *) _prm;
+	MultidimArray<double> &Iref=*(prm->Iref);
+	MultidimArray<double> &I=*(prm->I);
+	if (fabs(a-1.0)>prm->maxGrayFactor)
+		return 1e38;
+	if (fabs(b)>prm->maxGrayShift)
+		return 1e38;
+	if (prm->mask!=NULL)
+	{
+		MultidimArray<int> &mask=*(prm->mask);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mask)
+			if (DIRECT_MULTIDIM_ELEM(mask,n))
+				e+=fabs((a*DIRECT_MULTIDIM_ELEM(I,n)+b)-DIRECT_MULTIDIM_ELEM(Iref,n));
+	}
+	else
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I)
+			e+=fabs((a*DIRECT_MULTIDIM_ELEM(I,n)+b)-DIRECT_MULTIDIM_ELEM(Iref,n));
+
+	return e;
+}
+
+void adaptGrayValues(const MultidimArray< double >& Iref, MultidimArray<double> &I, double maxGrayFactor, double maxGrayShift, MultidimArray<int> *mask)
+{
+	AdaptGrayValuesAux aux;
+	aux.maxGrayFactor=maxGrayFactor;
+	aux.maxGrayShift=maxGrayShift;
+	aux.mask=mask;
+	aux.Iref=(MultidimArray<double> *)&Iref;
+	aux.I=&I;
+
+    Matrix1D<double> p(2), steps(2);
+    p(0)=1.0;
+    p(1)=0.0;
+    steps.initConstant(1.0);
+
+    int iter;
+    double e;
+	powellOptimizer(p, 1, 2, &adaptGrayValuesL1, &aux, 0.01, e, iter, steps, false);
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I)
+		DIRECT_MULTIDIM_ELEM(I,n)=a*DIRECT_MULTIDIM_ELEM(I,n)+b;
+}
+
 double fastBestRotation(const MultidimArray<double>& IrefCyl,
                         const MultidimArray<double>& Icyl, CorrelationAux &aux,
                         VolumeAlignmentAux &aux2, double deltaAng)
