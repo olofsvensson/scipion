@@ -49,15 +49,14 @@ from viewer_cltomo import XmippCLTomoViewer
 from viewer_ctf_discrepancy import XmippCTFDiscrepancyViewer
 from viewer_ml2d import XmippML2DViewer
 from viewer_movie_alignment import XmippMovieAlignViewer
+from viewer_multiple_fscs import XmippMultipleFSCsViewer
 from viewer_normalize_strain import XmippNormalizeStrainViewer
 from viewer_resolution3d import XmippResolution3DViewer
 from viewer_validate_nontilt import XmippValidateNonTiltViewer
 from viewer_split_volume import XmippViewerSplitVolume
 from viewer_validate_overfitting import XmippValidateOverfittingViewer
 from viewer_volume_strain import XmippVolumeStrainViewer
-
-#from viewer_reconstruct_significant import XmippReconstructSignificantViewer
-# TODO(coss): add viewer_reconstruct_significant.py pretty please
+from viewer_reconstruct_highres import XmippReconstructHighResViewer
 
 from plotter import XmippPlotter
 
@@ -82,6 +81,7 @@ from protocol_helical_parameters import XmippProtHelicalParameters
 from protocol_kerdensom import XmippProtKerdensom
 from protocol_ml2d import XmippProtML2D
 from protocol_movie_alignment import ProtMovieAlignment
+from protocol_multiple_fscs import XmippProtMultipleFSCs
 from protocol_multireference_alignability import XmippProtMultiRefAlignability
 from protocol_normalize_strain import XmippProtNormalizeStrain
 from protocol_particle_pick_automatic import XmippParticlePickingAutomatic
@@ -93,6 +93,7 @@ from protocol_projmatch import XmippProtProjMatch, XmippProjMatchViewer
 from protocol_random_conical_tilt import XmippProtRCT
 from protocol_ransac import XmippProtRansac
 from protocol_reconstruct_fourier import XmippProtReconstructFourier
+from protocol_reconstruct_highres import XmippProtReconstructHighRes
 from protocol_reconstruct_significant import XmippProtReconstructSignificant
 from protocol_resolution3d import XmippProtResolution3D
 from protocol_rotational_spectra import XmippProtRotSpectra 
