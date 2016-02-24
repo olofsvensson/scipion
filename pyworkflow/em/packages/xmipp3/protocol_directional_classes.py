@@ -26,14 +26,14 @@
 
 from os.path import join, exists
 from pyworkflow.object import Float, String
-from pyworkflow.protocol.params import (PointerParam, FloatParam,
-                                        StringParam, BooleanParam, LEVEL_ADVANCED,
-    BooleanParam)
+from pyworkflow.protocol.params import (PointerParam, FloatParam, IntParam,
+                                        StringParam, LEVEL_ADVANCED, BooleanParam)
 from pyworkflow.em.data import Volume
 from pyworkflow.em.protocol import ProtAnalysis3D
 from pyworkflow.utils.path import moveFile, makePath, cleanPath, cleanPattern
 from pyworkflow.em.packages.xmipp3.convert import writeSetOfParticles, readSetOfParticles
 import xmipp
+import math
 
 class XmippProtDirectionalClasses(ProtAnalysis3D):
     """    
@@ -67,6 +67,8 @@ class XmippProtDirectionalClasses(ProtAnalysis3D):
                       help="In pixels")
         form.addParam('refineAngles', BooleanParam, default=True, label='Refine angles', expertLevel=LEVEL_ADVANCED,
                       help="Refine the angles of the classes using a continuous angular assignment")
+        form.addParam('directionalClasses', IntParam, default=2, label='Number of directional classes', expertLevel=LEVEL_ADVANCED)
+        form.addParam('cl2dIterations', IntParam, default=5, label='Number of CL2D iterations', expertLevel=LEVEL_ADVANCED)
         
         form.addParallelSection(threads=0, mpi=8)
     
@@ -137,23 +139,21 @@ class XmippProtDirectionalClasses(ProtAnalysis3D):
             imgNo = block.split("_")[1]
             fnDir = self._getExtraPath("direction_%s"%imgNo)
             makePath(fnDir)
-            fnOut = join(fnDir,"level_01/class_classes.stk")
+            Nlevels = int(math.ceil(math.log(self.directionalClasses.get())/math.log(2)))
+            fnOut = join(fnDir,"level_%02d/class_classes.stk"%Nlevels)
             if not exists(fnOut):
-                args="-i %s@%s --odir %s --ref0 %s@%s --iter 5 --nref 2 --distance correlation --classicalMultiref --maxShift %d"%\
-                    (block,fnNeighbours,fnDir,imgNo,fnGallery,self.maxShift.get())
+                args="-i %s@%s --odir %s --ref0 %s@%s --iter %d --nref %d --distance correlation --classicalMultiref --maxShift %d"%\
+                    (block,fnNeighbours,fnDir,imgNo,fnGallery,self.cl2dIterations.get(),self.directionalClasses.get(),self.maxShift.get())
                 self.runJob("xmipp_classify_CL2D", args)
                 fnAlignRoot = join(fnDir,"classes")
                 self.runJob("xmipp_image_align","-i %s --ref %s@%s --oroot %s --iter 1"%(fnOut,imgNo,fnGallery,fnAlignRoot),numberOfMpi=1)
                 self.runJob("xmipp_transform_geometry","-i %s_alignment.xmd --apply_transform"%fnAlignRoot,numberOfMpi=1)
 
             # Construct output metadata
-            objId = mdOut.addObject()
-            mdOut.setValue(xmipp.MDL_REF,int(imgNo)-1,objId)
-            mdOut.setValue(xmipp.MDL_IMAGE,"1@%s"%fnOut,objId)
-
-            objId = mdOut.addObject()
-            mdOut.setValue(xmipp.MDL_REF,int(imgNo)-1,objId)
-            mdOut.setValue(xmipp.MDL_IMAGE,"2@%s"%fnOut,objId)
+            for i in range(self.directionalClasses.get()):
+                objId = mdOut.addObject()
+                mdOut.setValue(xmipp.MDL_REF,int(imgNo)-1,objId)
+                mdOut.setValue(xmipp.MDL_IMAGE,"%d@%s"%(i+1,fnOut),objId)
         fnDirectional=self._getPath("directionalClasses.xmd")
         mdOut.write(fnDirectional)
         self.runJob("xmipp_metadata_utilities","-i %s --set join %s ref"%(fnDirectional,self._getExtraPath("gallery.doc")), numberOfMpi=1)
