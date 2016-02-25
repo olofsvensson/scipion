@@ -28,6 +28,7 @@
 
 #include <data/xmipp_program.h>
 #include <data/mask.h>
+#include <data/basic_pca.h>
 
 /**@defgroup ClassificationFirstSplit Classification first split
    @ingroup ReconsLibrary */
@@ -73,9 +74,10 @@ public:
     void vectorToVolume(const MultidimArray<double> &v, MultidimArray<double> &V);
 public:
     Image<double> Vout;
-    MultidimArray<double> v, vsum;
+    MultidimArray<double> v;
     int Nvols;
     size_t maskSize;
+    PCAonline pca;
 };
 //@}
 #endif

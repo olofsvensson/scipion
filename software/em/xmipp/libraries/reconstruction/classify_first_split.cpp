@@ -122,9 +122,11 @@ void ProgClassifyFirstSplit::run()
     }
     progress_bar(Nrec);
 
-    vsum/=Nvols;
-    vectorToVolume(vsum,Vout());
+    vectorToVolume(pca.ysum,Vout());
+    Vout()/=Nvols;
     Vout.write(fnRoot+"_avg.vol");
+    vectorToVolume(pca.c1,Vout());
+    Vout.write(fnRoot+"_pc1.vol");
 //    deleteFile(fnSubset);
 //    deleteFile(fnSubsetVol);
 }
@@ -163,11 +165,10 @@ void ProgClassifyFirstSplit::updateWithNewVolume(const MultidimArray<double> &V)
 
 	    // Resize some internal variables
 	    maskSize=(size_t) mask.get_binary_mask().sum();
-	    vsum.initZeros(maskSize);
 	}
 
 	volumeToVector(V,v);
-	vsum+=v;
+	pca.addVector(v);
 	Nvols++;
 }
 
