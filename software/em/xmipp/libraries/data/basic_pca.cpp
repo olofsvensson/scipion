@@ -506,8 +506,8 @@ void PCAonline::addVector(MultidimArray<double> &y)
 			DIRECT_MULTIDIM_ELEM(yxt,n)=DIRECT_MULTIDIM_ELEM(c1,n)=yval-0.5*DIRECT_MULTIDIM_ELEM(ysum,n);// c1=y-ysum/2
 			xxt+=DIRECT_MULTIDIM_ELEM(c1,n)*DIRECT_MULTIDIM_ELEM(c1,n);
 		}
-		zn=sqrt(xxt);
-		c1/=zn; // Normalize c1
+		c1/=sqrt(xxt); // Normalize c1
+		zn=1;
 		N=2;
 	}
 	else
