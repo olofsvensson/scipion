@@ -27,6 +27,7 @@
 #define _PROG_CLASSIFICATION_FIRST_SPLIT
 
 #include <data/xmipp_program.h>
+#include <data/mask.h>
 
 /**@defgroup ClassificationFirstSplit Classification first split
    @ingroup ReconsLibrary */
@@ -45,6 +46,10 @@ public:
     int Nsamples;
     /** Symmetry */
     FileName fnSym;
+    /** External mask */
+    bool externalMask;
+    /** Mask */
+    Mask mask;
 public:
     /// Read argument from command line
     void readParams();
@@ -57,6 +62,20 @@ public:
 
     /// Run
     void run();
+
+    /// Update with new volume
+    void updateWithNewVolume(const MultidimArray<double> &V);
+
+    // Extract vector from volume
+    void volumeToVector(const MultidimArray<double> &V, MultidimArray<double> &v);
+
+    // Fill volume with vector
+    void vectorToVolume(const MultidimArray<double> &v, MultidimArray<double> &V);
+public:
+    Image<double> Vout;
+    MultidimArray<double> v, vsum;
+    int Nvols;
+    size_t maskSize;
 };
 //@}
 #endif

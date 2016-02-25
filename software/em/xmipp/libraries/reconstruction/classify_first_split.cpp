@@ -34,6 +34,9 @@ void ProgClassifyFirstSplit::readParams()
     Nrec = getIntParam("--Nrec");
     Nsamples = getIntParam("--Nsamples");
     fnSym = getParam("--sym");
+    mask.allowed_data_types = INT_MASK;
+    if ((externalMask=checkParam("--mask")))
+        mask.readParams(this);
 }
 
 // Show ====================================================================
@@ -59,6 +62,7 @@ void ProgClassifyFirstSplit::defineParams()
     addParamsLine("  [--Nrec <n=100>]             : Number of reconstructions");
     addParamsLine("  [--Nsamples <n=8>]           : Number of images in each reconstruction");
     addParamsLine("  [--sym <sym=c1>]             : Symmetry");
+    mask.defineParams(this,INT_MASK);
 }
 
 void ProgClassifyFirstSplit::run()
@@ -76,6 +80,9 @@ void ProgClassifyFirstSplit::run()
     FileName fnSubset=fnRoot+"_subset.xmd";
     FileName fnSubsetVol=fnRoot+"_subset.vol";
     String command=formatString("xmipp_reconstruct_fourier -i %s -o %s --max_resolution 0.25 -v 0",fnSubset.c_str(),fnSubsetVol.c_str());
+
+    Image<double> V;
+    Nvols = 0;
     std::cerr << "Generating reconstructions from random subsets ...\n";
     init_progress_bar(Nrec);
     for (int n=0; n<Nrec; n++)
@@ -103,11 +110,64 @@ void ProgClassifyFirstSplit::run()
     			}
 			}
     	}
-
     	mdRec.write(fnSubset);
 
+    	// Perform reconstruction
     	int retval=system(command.c_str());
+    	V.read(fnSubsetVol);
+    	V().setXmippOrigin();
+    	updateWithNewVolume(V());
+
     	progress_bar(n);
     }
     progress_bar(Nrec);
+
+    vsum/=Nvols;
+    vectorToVolume(vsum,Vout());
+    Vout.write(fnRoot+"_avg.vol");
+//    deleteFile(fnSubset);
+//    deleteFile(fnSubsetVol);
 }
+
+void ProgClassifyFirstSplit::volumeToVector(const MultidimArray<double> &V, MultidimArray<double> &v)
+{
+	v.resizeNoCopy(maskSize);
+	const MultidimArray<int> &mmask = mask.get_binary_mask();
+	size_t idx=0;
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mmask)
+	if (DIRECT_MULTIDIM_ELEM(mmask,n))
+		DIRECT_MULTIDIM_ELEM(v,idx++)=DIRECT_MULTIDIM_ELEM(V,n);
+}
+
+void ProgClassifyFirstSplit::vectorToVolume(const MultidimArray<double> &v, MultidimArray<double> &V)
+{
+	const MultidimArray<int> &mmask = mask.get_binary_mask();
+	V.initZeros(mmask);
+	size_t idx=0;
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mmask)
+	if (DIRECT_MULTIDIM_ELEM(mmask,n))
+		DIRECT_MULTIDIM_ELEM(V,n)=DIRECT_MULTIDIM_ELEM(v,idx++);
+}
+
+void ProgClassifyFirstSplit::updateWithNewVolume(const MultidimArray<double> &V)
+{
+	if (Nvols==0)
+	{
+	    if (!externalMask)
+	    {
+	    	mask.type = BINARY_CIRCULAR_MASK;
+	    	mask.mode = INNER_MASK;
+	    	mask.R1 = XSIZE(V)/2;
+	    }
+	    mask.generate_mask(V);
+
+	    // Resize some internal variables
+	    maskSize=(size_t) mask.get_binary_mask().sum();
+	    vsum.initZeros(maskSize);
+	}
+
+	volumeToVector(V,v);
+	vsum+=v;
+	Nvols++;
+}
+
