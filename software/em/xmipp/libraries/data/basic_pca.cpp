@@ -478,3 +478,60 @@ void PCAMahalanobisAnalyzer::evaluateZScore(int NPCA, int Niter, bool trained)
     Zscore.indexSort(idx);
 }
 #undef DEBUG
+
+// Empty constructor
+PCAonline::PCAonline()
+{
+	N=0;
+}
+
+// Add a new vector
+void PCAonline::addVector(MultidimArray<double> &y)
+{
+	if (N==0)
+	{
+		ysum=y;
+		yxt.resizeNoCopy(y);
+		c1.resizeNoCopy(y);
+		N=1;
+		zn=0;
+	}
+	else if (N==1)
+	{
+		xxt=0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(y)
+		{
+			double yval=DIRECT_MULTIDIM_ELEM(y,n);
+			DIRECT_MULTIDIM_ELEM(ysum,n)+=yval; // ysum+=y
+			DIRECT_MULTIDIM_ELEM(yxt,n)=DIRECT_MULTIDIM_ELEM(c1,n)=yval-0.5*DIRECT_MULTIDIM_ELEM(ysum,n);// c1=y-ysum/2
+			xxt+=DIRECT_MULTIDIM_ELEM(c1,n)*DIRECT_MULTIDIM_ELEM(c1,n);
+		}
+		zn=sqrt(xxt);
+		c1/=zn; // Normalize c1
+		N=2;
+	}
+	else
+	{
+		N++;
+		double iN=1.0/N;
+		zn=0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(y)
+		{
+			double yval=DIRECT_MULTIDIM_ELEM(y,n);
+			DIRECT_MULTIDIM_ELEM(ysum,n)+=yval; // ysum+=y
+			DIRECT_MULTIDIM_ELEM(y,n)=yval-iN*DIRECT_MULTIDIM_ELEM(ysum,n);// ycentered=y-ysum/N
+			zn+=DIRECT_MULTIDIM_ELEM(c1,n)*DIRECT_MULTIDIM_ELEM(y,n); // zn = ycentered^T c1
+		}
+
+		xxt+=zn*zn;
+		double ixxt=1.0/xxt;
+		double c1norm=0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(y)
+		{
+			DIRECT_MULTIDIM_ELEM(yxt,n)+=zn*DIRECT_MULTIDIM_ELEM(y,n); // yxt+=zn*ycentered
+			DIRECT_MULTIDIM_ELEM(c1,n)=ixxt*DIRECT_MULTIDIM_ELEM(yxt,n); // c1=yxt/xxt
+			c1norm+=DIRECT_MULTIDIM_ELEM(c1,n)*DIRECT_MULTIDIM_ELEM(c1,n);
+		}
+		c1/=sqrt(c1norm);
+	}
+}
