@@ -1,0 +1,113 @@
+/***************************************************************************
+ *
+ * Authors:    Carlos Oscar Sanchez Sorzano coss@cnb.csic.es
+ *
+ * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+ * 02111-1307  USA
+ *
+ *  All comments concerning this program package may be sent to the
+ *  e-mail address 'xmipp@cnb.csic.es'
+ ***************************************************************************/
+
+#include "classify_first_split.h"
+#include <data/symmetries.h>
+
+// Read arguments ==========================================================
+void ProgClassifyFirstSplit::readParams()
+{
+    fnClasses = getParam("-i");
+    fnRoot = getParam("--oroot");
+    Nrec = getIntParam("--Nrec");
+    Nsamples = getIntParam("--Nsamples");
+    fnSym = getParam("--sym");
+}
+
+// Show ====================================================================
+void ProgClassifyFirstSplit::show()
+{
+    if (!verbose)
+        return;
+    std::cout
+    << "Input classes:       " << fnClasses          << std::endl
+    << "Output root:         " << fnRoot             << std::endl
+    << "N. reconstructions:  " << Nrec               << std::endl
+    << "N. samples:          " << Nsamples           << std::endl
+    << "Symmetry:            " << fnSym              << std::endl
+    ;
+}
+
+// usage ===================================================================
+void ProgClassifyFirstSplit::defineParams()
+{
+    addUsageLine("Produce a first volume split from a set of directional classes");
+    addParamsLine("   -i <metadata>               : Metadata with the list of directional classes with angles");
+    addParamsLine("  [--oroot <fnroot=split>]     : Rootname for the output");
+    addParamsLine("  [--Nrec <n=100>]             : Number of reconstructions");
+    addParamsLine("  [--Nsamples <n=8>]           : Number of images in each reconstruction");
+    addParamsLine("  [--sym <sym=c1>]             : Symmetry");
+}
+
+void ProgClassifyFirstSplit::run()
+{
+    show();
+
+    MetaData md, mdRec;
+    md.read(fnClasses);
+
+    SymList SL;
+    SL.readSymmetryFile(fnSym);
+    int Nsym=SL.symsNo()+1;
+    Matrix2D<double> E, L, R;
+
+    FileName fnSubset=fnRoot+"_subset.xmd";
+    FileName fnSubsetVol=fnRoot+"_subset.vol";
+    String command=formatString("xmipp_reconstruct_fourier -i %s -o %s --max_resolution 0.25 -v 0",fnSubset.c_str(),fnSubsetVol.c_str());
+    std::cerr << "Generating reconstructions from random subsets ...\n";
+    init_progress_bar(Nrec);
+    for (int n=0; n<Nrec; n++)
+    {
+    	// Generate random subset and randomize angles according to symmetry
+    	mdRec.selectRandomSubset(md,Nsamples);
+    	if (Nsym>1)
+    	{
+    		double rot, tilt, psi, rotp, tiltp, psip;
+    		FOR_ALL_OBJECTS_IN_METADATA(mdRec)
+			{
+    			int idx=round(rnd_unif(0,Nsym));
+    			if (idx>0)
+    			{
+					mdRec.getValue(MDL_ANGLE_ROT, rot, __iter.objId);
+					mdRec.getValue(MDL_ANGLE_TILT, tilt, __iter.objId);
+					mdRec.getValue(MDL_ANGLE_PSI, psi, __iter.objId);
+
+    	            SL.getMatrices(idx - 1, L, R, false);
+					Euler_apply_transf(L, R, rot, tilt, psi, rotp, tiltp, psip);
+
+					mdRec.setValue(MDL_ANGLE_ROT, rotp, __iter.objId);
+					mdRec.setValue(MDL_ANGLE_TILT, tiltp, __iter.objId);
+					mdRec.setValue(MDL_ANGLE_PSI, psip, __iter.objId);
+    			}
+			}
+    	}
+
+    	mdRec.write(fnSubset);
+
+    	int retval=system(command.c_str());
+    	progress_bar(n);
+    }
+    progress_bar(Nrec);
+}
