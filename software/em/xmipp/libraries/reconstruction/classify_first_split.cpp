@@ -62,6 +62,7 @@ void ProgClassifyFirstSplit::defineParams()
     addParamsLine("  [--Nrec <n=100>]             : Number of reconstructions");
     addParamsLine("  [--Nsamples <n=8>]           : Number of images in each reconstruction");
     addParamsLine("  [--sym <sym=c1>]             : Symmetry");
+    addParamsLine("  [--alpha <a=0.05>]           : Alpha for the generation of the two separated volumes");
     mask.defineParams(this,INT_MASK);
 }
 
@@ -85,6 +86,7 @@ void ProgClassifyFirstSplit::run()
     Nvols = 0;
     std::cerr << "Generating reconstructions from random subsets ...\n";
     init_progress_bar(Nrec);
+    MultidimArray<double> zn(Nrec);
     for (int n=0; n<Nrec; n++)
     {
     	// Generate random subset and randomize angles according to symmetry
@@ -117,18 +119,46 @@ void ProgClassifyFirstSplit::run()
     	V.read(fnSubsetVol);
     	V().setXmippOrigin();
     	updateWithNewVolume(V());
+    	zn(n)=pca.getCurrentProjection();
 
     	progress_bar(n);
     }
     progress_bar(Nrec);
+    deleteFile(fnSubset);
+    deleteFile(fnSubsetVol);
 
-    vectorToVolume(pca.ysum,Vout());
-    Vout()/=Nvols;
-    Vout.write(fnRoot+"_avg.vol");
-    vectorToVolume(pca.c1,Vout());
-    Vout.write(fnRoot+"_pc1.vol");
-//    deleteFile(fnSubset);
-//    deleteFile(fnSubsetVol);
+    // Save average and first principal component
+    Image<double> V1, V2, Vdiff;
+    vectorToVolume(pca.c1,V1());
+    V1.write(fnRoot+"_pc1.vol");
+
+    vectorToVolume(pca.ysum,V1());
+    V1()/=Nvols;
+    V1.write(fnRoot+"_avg.vol");
+    V2()=V1();
+
+    // Analyze now the projections
+    MultidimArray<double> znSorted;
+    zn.sort(znSorted);
+    double z1=zn(int(alpha/2*Nrec));
+    double z2=zn(int((1-alpha/2)*Nrec));
+    std::cout << "z1=" << z1 << " z2=" << z2 << std::endl;
+
+    v=pca.c1;
+    v*=z1;
+    vectorToVolume(v,Vdiff());
+    V1()+=Vdiff();
+    V1.write(fnRoot+"_v1.vol");
+
+    v=pca.c1;
+    v*=z2;
+    vectorToVolume(v,Vdiff());
+    V2()+=Vdiff();
+    V2.write(fnRoot+"_v2.vol");
+
+    Vdiff()=V2();
+    Vdiff()-=V1();
+    Vdiff.write(fnRoot+"_diff.vol");
 }
 
 void ProgClassifyFirstSplit::volumeToVector(const MultidimArray<double> &V, MultidimArray<double> &v)

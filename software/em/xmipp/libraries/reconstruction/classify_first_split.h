@@ -51,6 +51,8 @@ public:
     bool externalMask;
     /** Mask */
     Mask mask;
+    /** Alpha */
+    double alpha;
 public:
     /// Read argument from command line
     void readParams();
@@ -73,7 +75,6 @@ public:
     // Fill volume with vector
     void vectorToVolume(const MultidimArray<double> &v, MultidimArray<double> &V);
 public:
-    Image<double> Vout;
     MultidimArray<double> v;
     int Nvols;
     size_t maskSize;
