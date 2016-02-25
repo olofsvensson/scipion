@@ -34,6 +34,7 @@ void ProgClassifyFirstSplit::readParams()
     Nrec = getIntParam("--Nrec");
     Nsamples = getIntParam("--Nsamples");
     fnSym = getParam("--sym");
+    alpha = getDoubleParam("--alpha");
     mask.allowed_data_types = INT_MASK;
     if ((externalMask=checkParam("--mask")))
         mask.readParams(this);
@@ -50,6 +51,7 @@ void ProgClassifyFirstSplit::show()
     << "N. reconstructions:  " << Nrec               << std::endl
     << "N. samples:          " << Nsamples           << std::endl
     << "Symmetry:            " << fnSym              << std::endl
+	<< "Alpha:               " << alpha              << std::endl
     ;
 }
 
@@ -139,9 +141,9 @@ void ProgClassifyFirstSplit::run()
 
     // Analyze now the projections
     MultidimArray<double> znSorted;
-    zn.sort(znSorted);
-    double z1=zn(int(alpha/2*Nrec));
-    double z2=zn(int((1-alpha/2)*Nrec));
+	std::cout << znSorted << std::endl;
+    double z1=znSorted(int(alpha/2*Nrec));
+    double z2=znSorted(int((1-alpha/2)*Nrec));
     std::cout << "z1=" << z1 << " z2=" << z2 << std::endl;
 
     v=pca.c1;
@@ -155,10 +157,6 @@ void ProgClassifyFirstSplit::run()
     vectorToVolume(v,Vdiff());
     V2()+=Vdiff();
     V2.write(fnRoot+"_v2.vol");
-
-    Vdiff()=V2();
-    Vdiff()-=V1();
-    Vdiff.write(fnRoot+"_diff.vol");
 }
 
 void ProgClassifyFirstSplit::volumeToVector(const MultidimArray<double> &V, MultidimArray<double> &v)
