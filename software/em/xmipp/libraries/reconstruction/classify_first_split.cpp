@@ -75,6 +75,14 @@ void ProgClassifyFirstSplit::run()
     MetaData md, mdRec;
     md.read(fnClasses);
 
+    // Generate the mean
+    std::cerr << "Reconstructing average" << std::endl;
+    String command=formatString("xmipp_reconstruct_fourier -i %s -o %s_avg.vol --max_resolution 0.25 -v 0",fnClasses.c_str(),fnRoot.c_str());
+    int retval=system(command.c_str());
+    Image<double> Vavg;
+    Vavg.read(fnRoot+"_avg.vol");
+    Vavg().setXmippOrigin();
+
     SymList SL;
     SL.readSymmetryFile(fnSym);
     int Nsym=SL.symsNo()+1;
@@ -82,13 +90,14 @@ void ProgClassifyFirstSplit::run()
 
     FileName fnSubset=fnRoot+"_subset.xmd";
     FileName fnSubsetVol=fnRoot+"_subset.vol";
-    String command=formatString("xmipp_reconstruct_fourier -i %s -o %s --max_resolution 0.25 -v 0",fnSubset.c_str(),fnSubsetVol.c_str());
+    command=formatString("xmipp_reconstruct_fourier -i %s -o %s --max_resolution 0.25 -v 0",fnSubset.c_str(),fnSubsetVol.c_str());
 
     Image<double> V;
     Nvols = 0;
     std::cerr << "Generating reconstructions from random subsets ...\n";
     init_progress_bar(Nrec);
     MultidimArray<double> zn(Nrec);
+    pca.maxzn=2; // Skip outliers
     for (int n=0; n<Nrec; n++)
     {
     	// Generate random subset and randomize angles according to symmetry
@@ -117,11 +126,16 @@ void ProgClassifyFirstSplit::run()
     	mdRec.write(fnSubset);
 
     	// Perform reconstruction
-    	int retval=system(command.c_str());
+    	retval=system(command.c_str());
     	V.read(fnSubsetVol);
     	V().setXmippOrigin();
+//    	V.write(formatString("%s_%05d.vol",fnRoot.c_str(),n));
+    	V()-=Vavg();
+//    	V.write(formatString("%s_%05d_diff.vol",fnRoot.c_str(),n));
     	updateWithNewVolume(V());
     	zn(n)=pca.getCurrentProjection();
+//    	std::cout << "zn=" << zn(n) << std::endl;
+//    	char c; std::cin >> c;
 
     	progress_bar(n);
     }
@@ -133,15 +147,14 @@ void ProgClassifyFirstSplit::run()
     Image<double> V1, V2, Vdiff;
     vectorToVolume(pca.c1,V1());
     V1.write(fnRoot+"_pc1.vol");
-
     vectorToVolume(pca.ysum,V1());
-    V1()/=Nvols;
-    V1.write(fnRoot+"_avg.vol");
+    V1()/=pca.N;
+    V1()+=Vavg();
     V2()=V1();
 
     // Analyze now the projections
     MultidimArray<double> znSorted;
-	std::cout << znSorted << std::endl;
+    zn.sort(znSorted);
     double z1=znSorted(int(alpha/2*Nrec));
     double z2=znSorted(int((1-alpha/2)*Nrec));
     std::cout << "z1=" << z1 << " z2=" << z2 << std::endl;
