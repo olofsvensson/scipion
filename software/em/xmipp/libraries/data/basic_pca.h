@@ -157,9 +157,10 @@ public:
 /** Online PCA */
 class PCAonline {
 public:
-	MultidimArray<double> ysum, yxt, c1;
+	MultidimArray<double> ysum, yxt, c1, ycentered;
 	double zn, xxt;
 	int N;
+	double maxzn;
 public:
 	/// Empty constructor
 	PCAonline();
