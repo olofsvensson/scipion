@@ -33,7 +33,6 @@ from pyworkflow.em.protocol import ProtClassify3D
 from pyworkflow.em.data import Volume
 from pyworkflow.em.convert import ImageHandler
 from pyworkflow.em.packages.xmipp3.protocol_directional_classes import XmippProtDirectionalClasses
-from xmipp import getImageSize
 
 class XmippProtSplitvolume(ProtClassify3D):
     """Split volume in two"""
