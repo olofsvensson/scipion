@@ -59,7 +59,7 @@ void ProgReconstructSignificant::defineParams()
     addParamsLine("  [--angDistance <a=10>]       : Angular distance");
     addParamsLine("  [--dontApplyFisher]          : Do not select directions using Fisher");
     addParamsLine("  [--dontReconstruct]          : Do not reconstruct");
-    addParamsLine("  [--useForValidation <numOrientationsPerParticle=10>] : Use the program for validation. This number defines the number of possible orientations per particle");
+    addParamsLine("  [--useForValidation <numOrientationsPerParticle=5>] : Use the program for validation. This number defines the number of possible orientations per particle");
 }
 
 // Read arguments ==========================================================

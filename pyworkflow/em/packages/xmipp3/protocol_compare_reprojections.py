@@ -25,6 +25,7 @@
 # **************************************************************************
 
 from math import floor
+from os.path import exists
 
 from pyworkflow.protocol.params import PointerParam, StringParam, FloatParam, BooleanParam
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
@@ -34,15 +35,20 @@ from pyworkflow.em.data import SetOfClasses2D, Image, SetOfAverages,\
     SetOfParticles
 from pyworkflow.em.packages.xmipp3.convert import setXmippAttributes, xmippToLocation
 import pyworkflow.em.metadata as md
+from pyworkflow.protocol.constants import LEVEL_ADVANCED
 
 import xmipp
 from xmipp3 import ProjMatcher
 
         
 class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
-    """Compares a set of classes or averages with the corresponding projections
-     of a reference volume.
-    """
+    """Compares a set of classes or averages with the corresponding projections of a reference volume.
+    The set of images must have a 3D angular assignment and the protocol computes the residues
+    (the difference between the experimental images and the reprojections). The zscore of the mean
+    and variance of the residues are computed. Large values of these scores may indicate outliers.
+    The protocol also analyze the covariance matrix of the residual and computes the logarithm of
+    its determinant [Cherian2013]. The extremes of this score (called zScoreResCov), that is
+    values particularly low or high, may indicate outliers."""
     _label = 'compare reprojections'
     
     def __init__(self, **args):
@@ -56,7 +62,6 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
         form.addParam('inputVolume', PointerParam, label="Volume to compare images to", important=True,
                       pointerClass='Volume',
                       help='Volume to be used for class comparison')
-        
         form.addParam('useAssignment', BooleanParam, default=True,
                       label='Use input angular assignment (if available)')
         form.addParam('symmetryGroup', StringParam, default="c1",
@@ -96,15 +101,18 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
         else:
             writeSetOfParticles(imgSet, self.imgsFn)
     
-    def produceResiduals(self,volumeFn,anglesFn,Ts):
-        if volumeFn.endswith(".mrc"):
-            volumeFn+=":mrc"
+    def produceResiduals(self):
         anglesOutFn=self._getExtraPath("anglesCont.stk")
         residualsOutFn=self._getExtraPath("residuals.stk")
         projectionsOutFn=self._getExtraPath("projections.stk")
         xdim=self.inputVolume.get().getDim()[0]
+        originalTs=self.inputVolume.get().getSamplingRate()
+        Ts=originalTs*xdim/float(self.residualSize.get())
         self.runJob("xmipp_angular_continuous_assign2", "-i %s -o %s --ref %s --optimizeAngles --optimizeGray --optimizeShift --max_shift %d --oresiduals %s --oprojections %s --sampling %f" %\
-                    (anglesFn,anglesOutFn,volumeFn,floor(xdim*0.05),residualsOutFn,projectionsOutFn,Ts))
+                    (self._getExtraPath('images.xmd'),anglesOutFn,self._getExtraPath("volume.vol"),floor(xdim*0.05),residualsOutFn,projectionsOutFn,Ts))
+        fnNewParticles=self._getExtraPath("images.stk")
+        if exists(fnNewParticles):
+            cleanPath(fnNewParticles)
     
     def evaluateResiduals(self):
         # Evaluate each image
@@ -118,6 +126,10 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
         cleanPath(fnAutoCorrelations)
     
     def createOutputStep(self):
+        fnImgs = self._getExtraPath('images.stk')
+        if exists(fnImgs):
+            cleanPath(fnImgs)
+
         outputSet = self._createSetOfParticles()
         imgSet = self.inputSet.get()
         imgFn = self._getExtraPath("anglesCont.xmd")
@@ -129,7 +141,6 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
         outputSet.copyItems(imgSet,
                             updateItemCallback=self._processRow,
                             itemDataIterator=md.iterRows(imgFn, sortByLabel=md.MDL_ITEM_ID))
-
         self._defineOutputs(outputParticles=outputSet)
         self._defineSourceRelation(self.inputSet, outputSet)
 
@@ -153,29 +164,18 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
         __setXmippImage(xmipp.MDL_IMAGE_COVARIANCE)
 
     #--------------------------- INFO functions --------------------------------------------
-    def _validate(self):
-        errors = []
-        vol = self.inputVolume.get()
-        xDim = self._getDimensions()
-        volDim = vol.getDim()[0]
-        
-        if volDim != xDim:
-            errors.append("Make sure that the volume and the images have the same size")
-        return errors    
-    
     def _summary(self):
         summary = []
         summary.append("Images evaluated: %i" % self.inputSet.get().getSize())
         summary.append("Volume: %s" % self.inputVolume.getNameId())
-        summary.append("symmetry: %s" % self.symmetryGroup.get())
         return summary
     
     def _methods(self):
         methods = []
-        if hasattr(self, 'outputClasses') or hasattr(self, 'outputAverages'):
-            methods.append("We evaluated %i input images %s regarding to volume %s"
-                           " using %s symmetry" %(self.inputSet.get().getSize(), self.getObjectTag('inputSet'), \
-                                                  self.getObjectTag('inputVolume'), self.symmetryGroup.get()) )
+        if hasattr(self, 'outputParticles'):
+            methods.append("We evaluated %i input images %s regarding to volume %s."\
+                           %(self.inputSet.get().getSize(), self.getObjectTag('inputSet'), self.getObjectTag('inputVolume')) )
+            methods.append("The residuals were evaluated according to their mean, variance and covariance structure [Cherian2013].")
         return methods
     
     #--------------------------- UTILS functions --------------------------------------------

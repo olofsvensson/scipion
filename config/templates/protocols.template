@@ -122,6 +122,7 @@ Protocols SPA = [
             {"tag": "protocol", "value": "ProtRelionRefine3D",   "text": "default"},
             {"tag": "protocol", "value": "ProtFrealign",   "text": "default"},
             {"tag": "protocol", "value": "XmippProtProjMatch",  "text": "default"},
+            {"tag": "protocol", "value": "XmippProtReconstructHighRes",  "text": "default"},
             {"tag": "protocol", "value": "EmanProtRefine",  "text": "default"},
             {"tag": "protocol", "value": "SpiderProtRefinement",  "text": "default"},
             {"tag": "section", "text": "more", "openItem": "False", "children": [
@@ -141,6 +142,7 @@ Protocols SPA = [
             {"tag": "protocol", "value": "XmippProtValidateNonTilt",    "text": "default"},
             {"tag": "protocol", "value": "XmippProtValidateOverfitting",    "text": "default"},
             {"tag": "protocol", "value": "XmippProtCompareReprojections", "text": "default"},
+            {"tag": "protocol", "value": "XmippProtDirectionalClasses", "text": "default"},
             {"tag": "section", "text": "more", "openItem": "False", "children": [
 	            {"tag": "protocol", "value": "XmippProtMultipleFSCs",  "text": "default"},
                 {"tag": "protocol", "value": "XmippProtConvertToPseudoAtoms", "text": "default"},
