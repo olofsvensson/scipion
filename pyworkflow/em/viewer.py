@@ -49,6 +49,7 @@ import metadata as md
 import xmipp
 from data import PdbFile
 
+from viewer_fsc import FscViewer
 
 #------------------------ Some common Views ------------------
 
@@ -72,11 +73,12 @@ class DataView(View):
             self._tableName, self._path = None, path
             
     def show(self):        
-        showj.runJavaIJapp(self._memory, 'xmipp.viewer.scipion.ScipionViewer', self.getShowJParams(), env=self._env)
+        showj.runJavaIJapp(self._memory, 'xmipp.viewer.scipion.ScipionViewer',
+                           self.getShowJParams(), env=self._env)
     
     def getShowJParams(self):
-        inputPath = self._path if not self._tableName else self._tableName + '@' + self._path
-        params = '-i ' + inputPath
+        tableName = '%s@' % self._tableName if self._tableName else ''
+        params = '-i "%s%s"' % (tableName, self._path)
         for key, value in self._viewParams.items():
             params = "%s --%s %s"%(params, key, value)
         
@@ -144,13 +146,52 @@ class ObjectView(DataView):
         
     def getShowJParams(self):
         # mandatory to provide scipion params
-        params = DataView.getShowJParams(self) + ' --scipion %s %s %s'%(self.port, self.inputid, self.other)
+        params = DataView.getShowJParams(self) + ' --scipion %s %s %s' % (self.port, self.inputid, self.other)
         return params
     
     def show(self):
         showj.runJavaIJapp(self._memory, 'xmipp.viewer.scipion.ScipionViewer', self.getShowJParams(), env=self._env)
         
-        
+
+class CtfView(ObjectView):
+    """ Customized ObjectView for SetOfCTF objects . """
+    # All extra labels that we want to show if present in the CTF results
+    PSD_LABELS = ['_psdFile', '_xmipp_enhanced_psd',
+                  '_xmipp_ctfmodel_quadrant', '_xmipp_ctfmodel_halfplane'
+                 ]
+    EXTRA_LABELS = ['_ctffind4_ctfResolution', '_xmipp_ctfCritFirstZero',
+                    ' _xmipp_ctfCritCorr13', '_xmipp_ctfCritFitting',
+                    '_xmipp_ctfCritNonAstigmaticValidity',
+                    '_xmipp_ctfCritCtfMargin', '_xmipp_ctfCritMaxFreq'
+                   ]
+    def __init__(self, project, ctfSet, other='', **kwargs):
+        first = ctfSet.getFirstItem()
+
+        def existingLabels(labelList):
+            return ' '.join([l for l in labelList if first.hasAttribute(l)])
+
+        psdLabels = existingLabels(self.PSD_LABELS)
+        extraLabels = existingLabels(self.EXTRA_LABELS)
+        labels =  'id enabled comment %s _defocusU _defocusV ' % psdLabels
+        labels += '_defocusAngle _defocusRatio %s  _micObj._filename' % extraLabels
+        viewParams = {showj.MODE: showj.MODE_MD,
+                      showj.ORDER: labels,
+                      showj.VISIBLE: labels,
+                      showj.ZOOM: 50
+                     }
+
+        if psdLabels:
+            viewParams[showj.RENDER] = psdLabels
+
+        if first.hasAttribute('_ctffind4_ctfResolution'):
+            viewParams[showj.OBJCMDS] = "'%s'" % showj.OBJCMD_CTFFIND4
+
+        inputId = ctfSet.getObjId() or ctfSet.getFileName()
+        ObjectView.__init__(self, project,
+                            inputId, ctfSet.getFileName(), other,
+                            viewParams, **kwargs)
+
+
 class ClassesView(ObjectView):
     """ Customized ObjectView for SetOfClasses. """
     def __init__(self, project, inputid, path, other='', viewParams={}, **kwargs):
@@ -176,11 +217,12 @@ class Classes3DView(ClassesView):
 
 class CoordinatesObjectView(DataView):
     """ Wrapper to View but for displaying Scipion objects. """
-    def __init__(self, project, path, outputdir, protocol, viewParams={}, **kwargs):
+    def __init__(self, project, path, outputdir, protocol, pickerProps=None, viewParams={}, **kwargs):
         DataView.__init__(self, path, **kwargs)
         self.project = project
         self.outputdir = outputdir
         self.protocol = protocol
+        self.pickerProps = pickerProps
         
 #     def getShowJParams(self):
 #         params = '--input %s --output %s --mode %s'%(self._path, self.outputdir, self.mode)
@@ -188,7 +230,7 @@ class CoordinatesObjectView(DataView):
     
     def show(self):
         #showj.runJavaIJapp(self._memory, 'xmipp.viewer.particlepicker.training.SupervisedPickerRunner', self.getShowJParams(), env=self._env)
-        showj.launchSupervisedPickerGUI(self._path, self.outputdir, self.protocol)
+        return showj.launchSupervisedPickerGUI(self._path, self.outputdir, self.protocol, pickerProps=self.pickerProps)
         
         
 class ImageView(View):

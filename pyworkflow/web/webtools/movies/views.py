@@ -37,6 +37,7 @@ from pyworkflow.tests.tests import DataSet
 from pyworkflow.utils import copyFile
 import pyworkflow.utils as pwutils
 from pyworkflow.utils.utils import prettyDelta
+from django.contrib.sites.models import Site
 
 def service_movies(request):
 
@@ -94,7 +95,7 @@ def create_movies_project(request):
                                         protocolsConf=manager.protocols
                                         )   
         
-        project.getSettings().setLifeTime(14)
+        project.getSettings().setLifeTime(336) # 14 days * 24 hours
         project.saveSettings()
         
         
@@ -173,9 +174,11 @@ def getAttrTestFile(key):
 
  
 def movies_content(request):
+    
+    domain = django_settings.SITE_URL
     projectName = request.GET.get('p', None)
     path_files = django_settings.ABSOLUTE_URL + '/resources_movies/img/'
-    command = "rsync -av --port 3333 USER_FOLDER/ scipion.cnb.csic.es::mws/" + projectName
+    command = "rsync -av --port 3333 USER_FOLDER/ %s::mws/%s"%(domain, projectName)
     
     manager = getServiceManager('movies')
     project = manager.loadProject(projectName, 
@@ -214,10 +217,10 @@ def movies_form(request):
 
 
 def upload_movies(request):
-
+    domain = django_settings.SITE_URL
     projectName = request.session['projectName']
     
-    command = "rsync -av --port 3333 USER_FOLDER/ scipion.cnb.csic.es::mws/" + projectName
+    command = "rsync -av --port 3333 USER_FOLDER/ %s::mws/%s"%(domain, projectName)
 
     context = {'command': command,
                'logo_scipion_small': getResourceIcon('logo_scipion_small'),

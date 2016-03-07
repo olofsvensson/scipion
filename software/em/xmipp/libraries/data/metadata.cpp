@@ -246,6 +246,64 @@ void MetaData::setColumnValues(const std::vector<MDObject> &valuesIn)
     }
 }
 
+bool MetaData::bindValue( size_t id) const
+{
+	bool success=true;
+
+	// Prepare statement.
+    if (!myMDSql->bindStatement( id))
+    {
+    	success = false;
+    }
+
+    return(success);
+}
+
+bool MetaData::initGetRow( bool addWhereClause) const
+{
+	bool success=true;
+
+	// Prepare statement.
+    if (!myMDSql->initializeSelect( addWhereClause, activeLabels))
+    {
+    	success = false;
+    }
+
+    return(success);
+}
+
+bool MetaData::execGetRow(MDRow &row)
+{
+	bool success=true;
+	std::vector<MDObject> mdValues;		// Vector to store values.
+
+	// Clear row.
+    row.clear();
+
+	// Execute statement.
+	if (!myMDSql->getObjectsValues( activeLabels, &mdValues))
+	{
+		success = false;
+	}
+	else
+	{
+		// Set values in row.
+		int i=0;
+	    for (std::vector<MDLabel>::const_iterator it = activeLabels.begin(); it != activeLabels.end(); ++it)
+	    {
+	    	row.setValue(mdValues[i]);
+	        i++;
+	    }
+	}
+
+    return(success);
+}
+
+void 	MetaData::finalizeGetRow(void)
+{
+	myMDSql->finalizePreparedStmt();
+}
+
 bool MetaData::getRow(MDRow &row, size_t id) const
 {
     row.clear();
@@ -259,16 +317,196 @@ bool MetaData::getRow(MDRow &row, size_t id) const
     return true;
 }
 
+bool MetaData::getRow2(MDRow &row, size_t id)
+{
+	bool success=true;
+
+	// Clear row.
+    row.clear();
+
+    // Initialize SELECT.
+	success = this->initGetRow( true);
+	if (success)
+	{
+		bindValue( id);
+
+		// Execute SELECT.
+		success = execGetRow( row);
+
+	    // Finalize SELECT.
+	    myMDSql->finalizePreparedStmt();
+	}
+
+	return(success);
+}
+
 //TODO: could be improve in a query for update the entire row
 #define SET_ROW_VALUES(row) \
     for (int i = 0; i < row._size; ++i){\
         const MDLabel &label = row.order[i];\
         if (row.containsLabel(label))\
-            setValue(*(row.getObject(label)), id);}
+            setValue(*(row.getObject(label)), id);}\
+
+bool MetaData::initSetRow(const MDRow &row)
+{
+    int 	i=0,j=0;					// Loop counter.
+    bool	success=true;				// Return value.
+    std::vector<MDLabel>   labels;		// Columns labels.
+
+    // Set label vector size.
+    labels.resize(row._size);
+
+    // Build labels vector:
+    j=0;
+    for (i=0; i<row._size; ++i)
+    {
+        const MDLabel &label = row.order[i];
+
+        if (row.containsLabel(label))
+        {
+        	addLabel( label);
+        	labels[j] = label;
+        	j++;
+        }
+    }
+    labels.resize(j);
+
+    // Prepare statement.
+    if (!myMDSql->initializeUpdate( labels))
+    {
+    	success = false;
+    }
+
+    return(success);
+}
+
+
+bool MetaData::execSetRow(const MDRow &row, size_t id)
+{
+	int		i=0, j=0;					// Loop counters.
+	bool	success=true;				// Return value.
+    std::vector<MDObject*> mdValues;	// Vector to store values.
+
+    // Set values vector size.
+    mdValues.resize(row._size);
+
+    // Build values vector.
+    j=0;
+    for (i=0; i<row._size; ++i)
+    {
+        const MDLabel &label = row.order[i];
+
+        if (row.containsLabel(label))
+        {
+        	addLabel( label);
+        	mdValues[i] = row.getObject( label);
+        	j++;
+        }
+    }
+    mdValues.resize(j);
+
+	// Execute statement.
+	if (!myMDSql->setObjectValues( id, mdValues))
+	{
+		success = false;
+	}
+
+	return(success);
+}
+
 
 void MetaData::setRow(const MDRow &row, size_t id)
 {
     SET_ROW_VALUES(row);
+}
+
+bool MetaData::setRow2(const MDRow &row, size_t id)
+{
+	bool	success=true;				// Return value.
+
+	// Initialize UPDATE.
+	success = initSetRow( row);
+	if (success)
+	{
+		// Execute UPDATE.
+		success = execSetRow( row, id);
+
+		// Finalize UPDATE.
+		myMDSql->finalizePreparedStmt();
+	}
+
+	return(success);
+}
+
+
+bool MetaData::initAddRow(const MDRow &row)
+{
+    int 	i=0,j=0;					// Loop counter.
+    bool	success=true;				// Return value.
+    std::vector<MDLabel>   	labels;		// Columns labels.
+    std::vector<MDObject*> 	mdValues;	// Vector to store values.
+
+    // Set vector size.
+    labels.resize(row._size);
+
+    // Get labels.
+    j=0;
+    for (i=0; i<row._size; ++i)
+    {
+        const MDLabel &label = row.order[i];
+
+        if (row.containsLabel(label))
+        {
+        	addLabel( label);
+        	labels[j] = label;
+        	j++;
+        }
+    }
+    labels.resize(j);
+
+    // Prepare statement (mdValues is not used).
+    if (!myMDSql->initializeInsert( &labels, mdValues))
+    {
+    	std::cout << "initAddRow: error executing myMDSql->initializeInsert" << std::endl;
+		success = false;
+    }
+
+    return(success);
+}
+
+
+bool MetaData::execAddRow(const MDRow &row)
+{
+    int 	i=0,j=0;					// Loop counter.
+    bool	success=true;				// Return value.
+    std::vector<MDObject*> 	mdValues;	// Vector to store values.
+
+    // Set values vector size.
+    mdValues.resize(row._size);
+
+    // Get values to insert.
+    j=0;
+    for (i=0; i<row._size; ++i)
+    {
+        const MDLabel &label = row.order[i];
+
+        if (row.containsLabel(label))
+        {
+        	addLabel( label);
+        	mdValues[j] = row.getObject( label);
+        	j++;
+        }
+    }
+    mdValues.resize(j);
+
+	// Execute statement.
+	if (!myMDSql->setObjectValues( -1, mdValues))
+	{
+		std::cout << "execAddRow: error executing myMDSql->setObjectValues" << std::endl;
+		success = false;
+	}
+
+    return(success);
 }
 
 size_t MetaData::addRow(const MDRow &row)
@@ -277,6 +515,25 @@ size_t MetaData::addRow(const MDRow &row)
     SET_ROW_VALUES(row);
 
     return id;
+}
+
+
+bool MetaData::addRow2(const MDRow &row)
+{
+	bool	success=true;				// Return value.
+
+	// Initialize INSERT.
+	success = initAddRow( row);
+	if (success)
+	{
+		// Execute INSERT.
+		success = execAddRow( row);
+
+		// Finalize INSERT.
+		myMDSql->finalizePreparedStmt();
+	}
+
+	return(success);
 }
 
 MetaData::MetaData()
@@ -627,11 +884,17 @@ void MetaData::write(const FileName &_outFile, WriteModeMetaData mode) const
     extFile = _outFile.getExtension();
 
     if (extFile=="xml")
+    {
         writeXML(outFile, blockName, mode);
+    }
     else if(extFile=="sqlite")
+    {
         writeDB(outFile, blockName, mode);
+    }
     else
+    {
         writeStar(outFile, blockName, mode);
+    }
 }
 
 void MetaData::writeStar(const FileName &outFile,const String &blockName, WriteModeMetaData mode) const
@@ -746,22 +1009,39 @@ void MetaData::append(const FileName &outFile) const
 
 void MetaData::_writeRows(std::ostream &os) const
 {
+	size_t i=0;				// Loop counter.
+	size_t length=0;		// Loop upper bound.
 
+	bool success=true;
+
+	// Prepare statement.
+	this->initGetRow( true);
+
+	// Metadata objects loop.
     FOR_ALL_OBJECTS_IN_METADATA(*this)
     {
-        for (size_t i = 0; i < activeLabels.size(); i++)
+        std::vector<MDObject> mdValues;
+
+        // Get metadata values.
+        this->bindValue( __iter.objId);
+    	myMDSql->getObjectsValues( activeLabels, &mdValues);
+
+    	// Build metadata line.
+    	length = activeLabels.size();
+    	for (i=0; i<length ;i++)
         {
             if (activeLabels[i] != MDL_STAR_COMMENT)
             {
-                MDObject mdValue(activeLabels[i]);
                 os.width(1);
-                myMDSql->getObjectValue(__iter.objId, mdValue);
-                mdValue.toStream(os, true);
+                mdValues[i].toStream(os, true);
                 os << " ";
             }
         }
+
         os << std::endl;
     }
+    // Finalize statement.
+    myMDSql->finalizePreparedStmt();
 }
 
 void MetaData::print() const
@@ -774,7 +1054,7 @@ void MetaData::write(std::ostream &os,const String &blockName, WriteModeMetaData
 {
     if(mode==MD_OVERWRITE)
         os << FileNameVersion << " * "// << (isColumnFormat ? "column" : "row")
-        << std::endl //write wich type of format (column or row) and the path;
+        << std::endl //write which type of format (column or row) and the path;
         << WordWrap(comment, line_max);     //write md comment in the 2nd comment line of header
     //write data block
     String _szBlockName("data_");
@@ -793,6 +1073,7 @@ void MetaData::write(std::ostream &os,const String &blockName, WriteModeMetaData
             }
         }
         _writeRows(os);
+
         //Put the activeObject to the first, if exists
     }
     else //rowFormat
@@ -845,8 +1126,8 @@ void MetaData::_readColumns(std::istream& is, std::vector<MDObject*> & columnVal
     while (is >> token)
         if (token.find('(') == String::npos)
         {
-            //label is not reconized, the MDValue will be created
-            //with MDL_UNDEFINED, wich will be ignored while reading data
+            //label is not recognized, the MDValue will be created
+            //with MDL_UNDEFINED, which will be ignored while reading data
             label = MDL::str2Label(token);
             if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
                 label = MDL_UNDEFINED; //ignore if not present in desiredLabels
@@ -861,7 +1142,6 @@ void MetaData::_readColumns(std::istream& is, std::vector<MDObject*> & columnVal
 void MetaData::_parseObjects(std::istream &is, std::vector<MDObject*> & columnValues, const std::vector<MDLabel> *desiredLabels, bool firstTime)
 {
 	size_t i=0;				// Loop counter.
-	std::stringstream ss;	// String that contains SQL sentence.
 	size_t size=0;			// Column values vector size.
 
 	// Columns loop.
@@ -913,7 +1193,7 @@ void MetaData::_parseObjects(std::istream &is, std::vector<MDObject*> & columnVa
 	}
 
 	// Insert elements in DB.
-	myMDSql->setObjectValues( columnValues, desiredLabels, firstTime);
+	myMDSql->setObjectValues( -1, columnValues, desiredLabels);
 }
 
 
@@ -982,7 +1262,7 @@ void MetaData::_readColumnsStar(mdBlock &block,
                 newline = end;
             String s(iter, newline - iter);//get current line
             ss.str(s);//set the string of the stream
-            //Take the first token wich is the label
+            //Take the first token which is the label
             //if the label contain spaces will fail
             ss >> s; //get the first token, the label
             label = MDL::str2Label(s);
@@ -1013,7 +1293,7 @@ void MetaData::_readColumnsStar(mdBlock &block,
 }
 
 /* This function will be used to parse the rows data
- * having read the columns labels before and setting wich are desired
+ * having read the columns labels before and setting which are desired
  * the useCommentAsImage is for compatibility with old DocFile format
  * where the image were in comments
  */
@@ -1068,29 +1348,37 @@ void MetaData::_readRowsStar(mdBlock &block, std::vector<MDObject*> & columnValu
     memcpy(buffer, block.loop, n);
     char *iter = buffer, *end = iter + n, * newline = NULL;
     _parsedLines = 0; //Check how many lines the md have
-    while (iter < end) //while there are data lines
-    {
-        //Assing \n position and check if NULL at the same time
-        if (!(newline = END_OF_LINE()))
-            newline = end;
-        line.assign(iter, newline - iter);
-        trim(line);
 
-        if (!line.empty() && line[0] != '#')
-        {
-            //_maxRows would be > 0 if we only want to read some
-            // rows from the md for performance reasons...
-            // anyway the number of lines will be counted in _parsedLines
-            if (_maxRows == 0 || _parsedLines < _maxRows)
-            {
-            	std::stringstream ss(line);
-            	_parseObjects( ss, columnValues, desiredLabels, firstTime);
-            	firstTime=false;
-            }
-            _parsedLines++;
-        }
-        iter = newline + 1; //go to next line
+    if (myMDSql->initializeInsert( desiredLabels, columnValues))
+    {
+		while (iter < end) //while there are data lines
+		{
+			//Assing \n position and check if NULL at the same time
+			if (!(newline = END_OF_LINE()))
+				newline = end;
+			line.assign(iter, newline - iter);
+			trim(line);
+
+			if (!line.empty() && line[0] != '#')
+			{
+				//_maxRows would be > 0 if we only want to read some
+				// rows from the md for performance reasons...
+				// anyway the number of lines will be counted in _parsedLines
+				if (_maxRows == 0 || _parsedLines < _maxRows)
+				{
+					std::stringstream ss(line);
+					_parseObjects( ss, columnValues, desiredLabels, firstTime);
+					firstTime=false;
+				}
+				_parsedLines++;
+			}
+			iter = newline + 1; //go to next line
+		}
+
+		// Finalize statement.
+		myMDSql->finalizePreparedStmt();
     }
+
     delete[] buffer;
 }
 
@@ -1267,13 +1555,12 @@ void MetaData::readStar(const FileName &filename,
 {
     //First try to open the file as a metadata
     size_t id;
-
     FileName inFile = filename.removeBlockName();
 
     if (!(isMetadataFile = inFile.isMetaData()))//if not a metadata, try to read as image or stack
     {
         Image<char> image;
-        if (decomposeStack) // If not decomposeStack it is no neccesary to read the image header
+        if (decomposeStack) // If not decomposeStack it is no necessary to read the image header
             image.read(filename, HEADER);
         if ( !decomposeStack || image().ndim == 1 ) //single image // !decomposeStack must be first
         {
@@ -1596,7 +1883,7 @@ bool MetaData::nextBlock(mdBuffer &buffer, mdBlock &block)
         BUFFER_MOVE(buffer, n);
         //Search for the end of line
         char *newLine = BUFFER_FIND(buffer, "\n", 1);
-        //Calculate lenght of block name, counting after data_
+        //Calculate length of block name, counting after data_
         block.nameSize = newLine - buffer.begin;
         //Search for next block if exists one
         //use assign and check if not NULL at same time
@@ -1663,6 +1950,15 @@ void MetaData::_setOperates(const MetaData &mdIn,
 		                    const MDLabel label,
 		                    SetOperation operation)
 {
+    std::vector<MDLabel> labels;
+    labels.push_back(label);
+    _setOperates(mdIn,labels,operation);
+}
+
+void MetaData::_setOperates(const MetaData &mdIn,
+		                    const std::vector<MDLabel> &labels,
+		                    SetOperation operation)
+{
     if (this == &mdIn) //not sense to operate on same metadata
         REPORT_ERROR(ERR_MD, "Couldn't perform this operation on input metadata");
     if (size() == 0 && mdIn.size() == 0)
@@ -1671,7 +1967,7 @@ void MetaData::_setOperates(const MetaData &mdIn,
     for (size_t i = 0; i < mdIn.activeLabels.size(); i++)
         addLabel(mdIn.activeLabels[i]);
 
-    mdIn.myMDSql->setOperate(this, label, operation);
+    mdIn.myMDSql->setOperate(this, labels, operation);
 }
 
 void MetaData::_setOperatesLabel(const MetaData &mdIn,
@@ -1684,14 +1980,15 @@ void MetaData::_setOperatesLabel(const MetaData &mdIn,
         REPORT_ERROR(ERR_MD, "Couldn't perform this operation if both metadata are empty");
     //Add label to be sure is present in output
     addLabel(label);
-    mdIn.myMDSql->setOperate(this, label, operation);
-
+    std::vector<MDLabel> labels;
+    labels.push_back(label);
+    mdIn.myMDSql->setOperate(this, labels, operation);
 }
 
 void MetaData::_setOperates(const MetaData &mdInLeft,
                             const MetaData &mdInRight,
-                            const MDLabel labelLeft,
-                            const MDLabel labelRight,
+                            const std::vector<MDLabel> &labelsLeft,
+                            const std::vector<MDLabel> &labelsRight,
                             SetOperation operation)
 {
     if (this == &mdInLeft || this == &mdInRight) //not sense to operate on same metadata
@@ -1700,10 +1997,19 @@ void MetaData::_setOperates(const MetaData &mdInLeft,
     for (size_t i = 0; i < mdInLeft.activeLabels.size(); i++)
         addLabel(mdInLeft.activeLabels[i]);
     for (size_t i = 0; i < mdInRight.activeLabels.size(); i++)
-        if(mdInRight.activeLabels[i]!=labelRight)
-            addLabel(mdInRight.activeLabels[i]);
+    {
+    	bool found=false;
+    	for (size_t j=0; j<labelsRight.size(); ++j)
+    		if (mdInRight.activeLabels[i]==labelsRight[j])
+    		{
+    			found=true;
+    			break;
+    		}
+    	if (!found)
+    		addLabel(mdInRight.activeLabels[i]);
+    }
 
-    myMDSql->setOperate(&mdInLeft, &mdInRight, labelLeft,labelRight, operation);
+    myMDSql->setOperate(&mdInLeft, &mdInRight, labelsLeft,labelsRight, operation);
 }
 
 void MetaData::unionDistinct(const MetaData &mdIn, const MDLabel label)
@@ -1765,7 +2071,22 @@ void MetaData::join2(const MetaData &mdInLeft, const MetaData &mdInRight, const 
                     const MDLabel labelRight, JoinType type)
 {
     clear();
-    _setOperates(mdInLeft, mdInRight, labelLeft,labelRight, (SetOperation)type);
+    std::vector<MDLabel> labelsLeft, labelsRight;
+    labelsLeft.push_back(labelLeft);
+    labelsRight.push_back(labelRight);
+    _setOperates(mdInLeft, mdInRight, labelsLeft,labelsRight, (SetOperation)type);
+}
+
+void MetaData::join1(const MetaData &mdInLeft, const MetaData &mdInRight, const std::vector<MDLabel> &labels, JoinType type)
+{
+    join2(mdInLeft, mdInRight, labels, labels, type);
+}
+
+void MetaData::join2(const MetaData &mdInLeft, const MetaData &mdInRight, const std::vector<MDLabel> &labelsLeft,
+                    const std::vector<MDLabel> &labelsRight, JoinType type)
+{
+    clear();
+    _setOperates(mdInLeft, mdInRight, labelsLeft,labelsRight, (SetOperation)type);
 }
 
 void MetaData::joinNatural(const MetaData &mdInLeft, const MetaData &mdInRight)
@@ -2127,6 +2448,50 @@ bool MDIterator::hasNext()
     return (objects != NULL && objIndex < size);
 }
 
+
+/** Constructor */
+MDRowIterator::MDRowIterator(MetaData &md)
+{
+	// Initialize SELECT statement.
+	md.initGetRow( false);
+
+	// Get first row.
+	this->rowReturned = md.execGetRow( this->currentRow);
+
+	// If not even one row returned then finalize SQL statement.
+	if (!this->hasNext())
+	{
+		// Finalize statement.
+		md.finalizeGetRow();
+	}
+}
+
+MDRow *MDRowIterator::getRow(void)
+{
+	return(&this->currentRow);
+}
+
+bool MDRowIterator::moveNext(MetaData &md)
+{
+	// Get first row.
+	this->rowReturned = md.execGetRow( this->currentRow);
+
+	// If no more rows then finalize SQL statement.
+	if (!this->hasNext())
+	{
+		// Finalize statement.
+		md.finalizeGetRow();
+	}
+
+	return this->rowReturned;
+}
+
+/** Function to check if a row has been retrieved */
+bool MDRowIterator::hasNext()
+{
+	return this->rowReturned;
+}
+
 //////////// Generators implementations
 inline double MDRandGenerator::getRandValue()
 {
@@ -2226,7 +2591,7 @@ void MDExpandGenerator::fillValue(MetaData &md, size_t objId)
     {
         expMd.read(fn);
         if (expMd.isColumnFormat() || expMd.isEmpty())
-            REPORT_ERROR(ERR_VALUE_INCORRECT, "Only can expand non empty and row formated metadatas");
+            REPORT_ERROR(ERR_VALUE_INCORRECT, "Only can expand non empty and row formatted metadatas");
         expMd.getRow(row, expMd.firstObject());
         md.setRow(row, objId);
     }

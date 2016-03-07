@@ -42,6 +42,7 @@ from protocol_base import SpiderProtocol
 class SpiderProtReconstruct(ProtRefine3D, SpiderProtocol):
     """
     Simple reconstruction protocol using Fourier back projection.
+    Uses Spider BP 32F program.
     Mainly used for testing conversion of Euler angles.
     """
     _label = 'reconstruct fourier'
@@ -52,6 +53,7 @@ class SpiderProtReconstruct(ProtRefine3D, SpiderProtocol):
 
         form.addParam('inputParticles', params.PointerParam, 
                       pointerClass='SetOfParticles', 
+                      pointerCondition='hasAlignmentProj',
                       label="Input particles", important=True,
                       help='Select the input particles.\n')  
         

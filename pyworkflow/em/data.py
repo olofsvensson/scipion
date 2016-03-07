@@ -28,12 +28,11 @@ This modules contains basic hierarchy
 for EM data objects like: Image, SetOfImage and others
 """
 
-from collections import OrderedDict
+import os
 import json
 
-from pyworkflow.mapper.sqlite import SqliteMapper, SqliteFlatMapper
 from pyworkflow.object import *
-from pyworkflow.utils.path import cleanPath, dirname, join, replaceExt, exists
+import pyworkflow.utils as pwutils
 
 from constants import *
 from convert import ImageHandler
@@ -374,10 +373,13 @@ class Image(EMObject):
     def getDim(self):
         """Return image dimensions as tuple: (Xdim, Ydim, Zdim)"""
         fn = self.getFileName()
-        if fn is not None and exists(fn.replace(':mrc', '')):
+        if fn is not None and os.path.exists(fn.replace(':mrc', '')):
             x, y, z, n = ImageHandler().getDimensions(self)
             return x, y, z
         return None
+
+    def getXDim(self):
+        return self.getDim()[0] if self.getDim() is not None else 0
     
     def getIndex(self):
         return self._index.get()
@@ -442,15 +444,6 @@ class Image(EMObject):
         self._ctfModel = newCTF
         
     def hasAcquisition(self):
-#<<<<<<< HEAD
-#        # This doesn't work
-#        #TODO: ASK  jose miguel. the commented line does not work ROB
-#        #return self._acquisition is not None
-#        try:
-#            return self._acquisition.getVoltage() is not None
-#        except:
-#            return False
-#=======
         return (self._acquisition is not None and
                 self._acquisition.getVoltage() is not None and
                 self._acquisition.getMagnification() is not None
@@ -525,6 +518,9 @@ class Particle(Image):
         
     def getCoordinate(self):
         return self._coordinate
+
+    def scaleCoordinate(self, factor):
+        self.getCoordinate().scale(factor)
     
     def getMicId(self):
         """ Return the micrograph id if the coordinate is not None.
@@ -567,7 +563,7 @@ class Volume(Image):
     def getDim(self):
         """Return image dimensions as tuple: (Xdim, Ydim, Zdim)"""
         fn = self.getFileName()
-        if fn is not None and exists(fn.replace(':mrc', '')):
+        if fn is not None and os.path.exists(fn.replace(':mrc', '')):
             x, y, z, n = ImageHandler().getDimensions(self)
 
             # Some volumes in mrc format can have the z dimension
@@ -678,10 +674,10 @@ class SetOfImages(EMSet):
     """ Represents a set of Images """
     ITEM_TYPE = Image
     
-    def __init__(self, **args):
-        EMSet.__init__(self, **args)
+    def __init__(self, **kwargs):
+        EMSet.__init__(self, **kwargs)
         self._samplingRate = Float()
-        self._hasCtf = Boolean(args.get('ctf', False))
+        self._hasCtf = Boolean(kwargs.get('ctf', False))
         self._alignment = String(ALIGN_NONE)
         self._isPhaseFlipped = Boolean(False)
         self._isAmplitudeCorrected = Boolean(False)
@@ -841,9 +837,10 @@ class SetOfImages(EMSet):
                 if firstItem is not None:
                     self._firstDim.set(firstItem.getDim())
             except Exception, ex:
-                print "Error reading dimension: ", ex
-                import traceback
-                traceback.print_exc()
+                if pwutils.envVarOn('SCIPION_DEBUG'):
+                    print "Error reading dimension: ", ex
+                    import traceback
+                    traceback.print_exc()
         dimStr = str(self._firstDim)
         s = "%s (%d items, %s, %0.2f A/px)" % (self.getClassName(), self.getSize(), dimStr, sampling)
         return s
@@ -1045,7 +1042,13 @@ class Coordinate(EMObject):
         self._y.set(y)
         
     def shiftY(self, shiftY):
-        self._y.sum(shiftY)    
+        self._y.sum(shiftY)
+
+    def scale(self, factor):
+        """ Scale both x and y coordinates by a given factor.
+        """
+        self._x.multiply(factor)
+        self._y.multiply(factor)
     
     def getPosition(self):
         """ Return the position of the coordinate as a (x, y) tuple.
@@ -1239,10 +1242,11 @@ class Transform(EMObject):
         m *= factor
         m[3, 3] = 1.
         
-    def scaleShifts2D(self, factor):
+    def scaleShifts(self, factor):
         m = self.getMatrix()
         m[0, 3] *= factor
         m[1, 3] *= factor
+        m[2, 3] *= factor
 
 
 class Class2D(SetOfParticles):
@@ -1331,7 +1335,7 @@ class SetOfClasses(EMSet):
     
     def _setItemMapperPath(self, classItem):
         """ Set the mapper path of this class according to the mapper
-        path of the SetOfClasses and also the prefix acording to class id
+        path of the SetOfClasses and also the prefix according to class id
         """
         classPrefix = 'Class%03d' % classItem.getObjId()
         classItem._mapperPath.set('%s,%s' % (self.getFileName(), classPrefix))
@@ -1550,7 +1554,7 @@ class Movie(Micrograph):
         Consider compressed Movie files"""
         if not self.isCompressed():
             fn = self.getFileName()
-            if fn is not None and exists(fn.replace(':mrc', '')):
+            if fn is not None and os.path.exists(fn.replace(':mrc', '')):
                 return ImageHandler().getDimensions(self)
         return None
     
@@ -1628,9 +1632,10 @@ class SetOfMovies(SetOfMicrographsBase):
                 self._firstDim.set(self.getFirstItem().getDim())
                 self._firstFrameNum.set(self.getDimensions()[3])
             except Exception, ex:
-                print "Error reading dimension: ", ex
-                import traceback
-                traceback.print_exc()
+                if pwutils.envVarOn('SCIPION_DEBUG'):
+                    print "Error reading dimension: ", ex
+                    import traceback
+                    traceback.print_exc()
         dimStr = str(self._firstDim)
         s = "%s (%d items, %d frames, %s, %0.2f A/px)" % (self.getClassName(), self.getSize(), self._firstFrameNum, dimStr, sampling)
         return s
@@ -1661,3 +1666,39 @@ class SetOfMovieParticles(SetOfParticles):
     """
     ITEM_TYPE = MovieParticle
     
+
+class FSC(EMObject):
+    """Store a Fourier Shell Correlation"""
+    def __init__(self, **kwargs):
+        EMObject.__init__(self, **kwargs)
+        self._x = CsvList(pType=float)
+        self._y = CsvList(pType=float)
+
+    def loadFromMd(self, mdObj, labelX, labelY):
+        """
+        Fill the x and y data of the FSC from a metadata.
+        Params:
+            mdObj: either a metadata object of a filename
+            labelX: label used for frequency
+            labelY: label used for FSC values
+        """
+        #iterate through x and y and create csvLists
+        import metadata as md
+        self._x.clear()
+        self._y.clear()
+
+        for row in md.iterRows(mdObj):
+            self._x.append(row.getValue(labelX))
+            self._y.append(row.getValue(labelY))
+
+    def getData(self):
+        return self._x, self._y
+
+    def setData(self, xData, yData):
+        self._x.set(xData)
+        self._y.set(yData)
+
+
+class SetOfFSCs(EMSet):
+    """Represents a set of Volumes"""
+    ITEM_TYPE = FSC

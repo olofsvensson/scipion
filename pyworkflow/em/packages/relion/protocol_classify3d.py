@@ -101,11 +101,8 @@ class ProtRelionClassify3D(ProtClassify3D, ProtRelionBase):
         return summary message for NORMAL EXECUTION. 
         """
         errors = []
-        partSizeX, _, _ = self._getInputParticles().getDim()
-        volSizeX, _, _ = self.referenceVolume.get().getDim()
-        if partSizeX != volSizeX:
-            errors.append('Volume and particles dimensions must be equal!!!')
-
+        self._validateDim(self._getInputParticles(), self.referenceVolume.get(),
+                          errors, 'Input particles', 'Reference volume')
         return errors
     
     def _validateContinue(self):
@@ -179,7 +176,7 @@ class ProtRelionClassify3D(ProtClassify3D, ProtRelionBase):
         dataStar = self._getFileName('data', iter=iteration)
         clsSet.classifyItems(updateItemCallback=self._updateParticle,
                              updateClassCallback=self._updateClass,
-                             itemDataIterator=md.iterRows(dataStar))
+                             itemDataIterator=md.iterRows(dataStar, sortByLabel=md.RLN_IMAGE_ID))
     
     def _updateParticle(self, item, row):
         item.setClassId(row.getValue(md.RLN_PARTICLE_CLASS))

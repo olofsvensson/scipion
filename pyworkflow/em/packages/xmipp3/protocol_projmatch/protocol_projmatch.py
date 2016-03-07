@@ -25,9 +25,6 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package implement projection matching using xmipp 3.1
-"""
 
 import xmipp
 from pyworkflow.object import Integer
@@ -174,8 +171,8 @@ class XmippProtProjMatch(ProtRefine3D, ProtClassify3D):
     def executeCtfGroupsStep(self, **kwargs):
         runExecuteCtfGroupsStep(self, **kwargs)
     
-    def transformMaskStep(self, args, **kwargs):
-        runTransformMaskStep(self, args, **kwargs)
+    def transformMaskStep(self, program, args, **kwargs):
+        runTransformMaskStep(self, program, args, **kwargs)
     
     def angularProjectLibraryStep(self, iterN, refN, args, stepParams, **kwargs):
         runAngularProjectLibraryStep(self, iterN, refN, args, stepParams, **kwargs)
@@ -192,8 +189,8 @@ class XmippProtProjMatch(ProtRefine3D, ProtClassify3D):
     def cleanVolumeStep(self, vol1, vol2):
         cleanPath(vol1, vol2)
     
-    def reconstructionStep(self, iterN, refN, program, method, args, suffix, mpi, threads, **kwargs):
-        runReconstructionStep(self, iterN, refN, program, method, args, suffix, mpi, threads, **kwargs)
+    def reconstructionStep(self, iterN, refN, program, method, args, suffix, **kwargs):
+        runReconstructionStep(self, iterN, refN, program, method, args, suffix, **kwargs)
     
     def storeResolutionStep(self, resolIterMd, resolIterMaxMd, sampling):
         runStoreResolutionStep(self, resolIterMd, resolIterMaxMd, sampling)
@@ -211,15 +208,17 @@ class XmippProtProjMatch(ProtRefine3D, ProtClassify3D):
     
     def _validate(self):
         errors = []
-        if self.doCTFCorrection and not self.doAutoCTFGroup and not exists(self.setOfDefocus.get()):
+
+        if (self.doCTFCorrection and not self.doAutoCTFGroup
+            and not exists(self.setOfDefocus.get())):
             errors.append("Error: for non-automated ctf grouping, please provide a docfile!")
-        if self.numberOfMpi<=1:
+
+        if self.numberOfMpi <= 1:
             errors.append("The number of MPI processes has to be larger than 1")
         
-        xDimImg = self.inputParticles.get().getXDim()
-        xDimVol, _, _ = self.input3DReferences.get().getDim()
-        if xDimImg != xDimVol:
-            errors.append("The dimensions of the volume(s) and particles must be equal!!!!")
+        self._validateDim(self.inputParticles.get(), self.input3DReferences.get(),
+                          errors, 'Input particles', 'Reference volume')
+
         return errors
     
     def _citations(self):
@@ -375,15 +374,17 @@ class XmippProtProjMatch(ProtRefine3D, ProtClassify3D):
         return self._lastIter.get()
     
     def _fillParticlesFromIter(self, partSet, iteration):
+        print("_fillParticlesFromIter")
         import pyworkflow.em.metadata as md
         
         imgSet = self.inputParticles.get()
         imgFn = "all_exp_images@" + self._getFileName('docfileInputAnglesIters', iter=iteration, ref=1)
         partSet.copyInfo(imgSet)
         partSet.setAlignmentProj()
+        
         partSet.copyItems(imgSet,
                             updateItemCallback=self._createItemMatrix,
-                            itemDataIterator=md.iterRows(imgFn))
+                            itemDataIterator=md.iterRows(imgFn, sortByLabel=md.MDL_ITEM_ID))
     
     def _createItemMatrix(self, item, row):
         from pyworkflow.em.packages.xmipp3.convert import createItemMatrix

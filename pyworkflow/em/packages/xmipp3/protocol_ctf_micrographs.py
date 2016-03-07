@@ -25,9 +25,6 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains the XmippCtfMicrographs protocol
-"""
 
 import pyworkflow.em as em
 import pyworkflow.em.metadata as md
@@ -39,7 +36,7 @@ from pyworkflow.em.constants import RELATION_CTF
 
 
 class XmippProtCTFMicrographs(ProtCTFMicrographs):
-    """Protocol to estimate CTF on a set of micrographs using Xmipp 3.1"""
+    """Protocol to estimate CTF on a set of micrographs using Xmipp"""
     _label = 'ctf estimation'
     
     _criterion="ctfCritFirstZero<5 OR ctfCritMaxFreq>20 OR ctfCritfirstZeroRatio<0.9 OR ctfCritfirstZeroRatio>1.1 OR "\
@@ -71,8 +68,8 @@ class XmippProtCTFMicrographs(ProtCTFMicrographs):
         form.addParam('ctfRelations', RelationParam, allowsNull=True,condition='doInitialCTF',
                       relationName=RELATION_CTF, attributeName='getInputMicrographs',
                       label='Previous CTF estimation',
-                      help='Choose some CTF estimation related to input micrographs. \n'
-                           'CTF estimation is need if you want to use the defocus found in a previous CTF estimation')
+                      help='Choose some CTF estimation related to input micrographs, '
+                           'in case you want to use the defocus values found previously')
 
         form.addParam('doCTFAutoDownsampling', BooleanParam, default=True, 
               label="Automatic CTF downsampling detection", expertLevel=LEVEL_ADVANCED, 
@@ -219,7 +216,10 @@ class XmippProtCTFMicrographs(ProtCTFMicrographs):
                                mdQuality.getValue(xmipp.MDL_CTF_CRIT_FIRSTMINIMUM_FIRSTZERO_DIFF_RATIO,mdQuality.firstObject()),
                                mdCTF.firstObject())
             else:
-                mdCTF = md.MetaData(self._getFileName('ctfErrorParam', micDir=micDir))
+                fnError=self._getFileName('ctfErrorParam', micDir=micDir)
+                if not exists(fnError):
+                    self._createErrorCtfParam(micDir)
+                mdCTF = md.MetaData(fnError)
             mdAux.importObjects( mdFn, md.MDValueEQ(md.MDL_MICROGRAPH_ID, long(mic.getObjId())))
             mdAux.merge(mdCTF)
             
@@ -240,7 +240,7 @@ class XmippProtCTFMicrographs(ProtCTFMicrographs):
 #         #TODO: Review with COSS and JM if this is needed
 #         if self.someMicrographsRejected and self.doAutomaticRejection:
 #             micSet = self._createSetOfMicrographs()
-#             micSet.copyInfo(inputMics)
+#             micSet.copFastDefyInfo(inputMics)
 #             md = md.MetaData(self._getPath("ctfs_selection.xmd"))
 #             for mdid in md:
 #                 micId = md.getValue(md.MDL_MICROGRAPH_ID,mdid)
@@ -268,7 +268,7 @@ class XmippProtCTFMicrographs(ProtCTFMicrographs):
     
     def _methods(self):
         str="We calculated the CTF of micrographs %s using Xmipp [Sorzano2007a]"%self.getObjectTag('inputMicrographs')
-        if self.doFastDefocus:
+        if self.doFastDefocus and not self.doInitialCTF:
             str+=" with a fast defocus estimate [Vargas2013a]"
         str+="."
         if self.methodsVar.hasValue():
@@ -279,7 +279,7 @@ class XmippProtCTFMicrographs(ProtCTFMicrographs):
     
     def _citations(self):
         papers = ['Sorzano2007a']
-        if self.doFastDefocus:
+        if self.doFastDefocus and not self.doInitialCTF:
             papers.append('Vargas2013a')
         return papers
     
@@ -290,7 +290,7 @@ class XmippProtCTFMicrographs(ProtCTFMicrographs):
         for par, val in params.iteritems():
             self._args += " --%s %s" % (par, str(val))
             
-        if self.doFastDefocus:
+        if self.doFastDefocus and not self.doInitialCTF:
             self._args += " --fastDefocus"
 
     def _prepareCommand(self):

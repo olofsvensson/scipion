@@ -107,9 +107,20 @@ def getEnviron():
             'PATH': join(os.environ['RELION_HOME'], 'bin'),
             'LD_LIBRARY_PATH': join(os.environ['RELION_HOME'], 'lib') + ":" + join(os.environ['RELION_HOME'], 'lib64'),
             'SCIPION_MPI_FLAGS': os.environ.get('RELION_MPI_FLAGS', ''),
-#            'LD_LIBRARY_PATH': join(os.environ['RELION_HOME'], 'lib64'),
             }, position=Environ.BEGIN)
     return environ
+
+
+def getVersion():
+    path = os.environ['RELION_HOME']
+    for v in getSupportedVersions():
+        if v in path:
+            return v
+    return ''
+
+
+def getSupportedVersions():
+    return ['1.3', '1.4']
 
 
 def locationToRelion(index, filename):
@@ -282,8 +293,8 @@ def alignmentToRow(alignment, alignmentRow, alignType):
     """
     is2D = alignType == em.ALIGN_2D
     inverseTransform = alignType == em.ALIGN_PROJ
-    
-    shifts, angles = geometryFromMatrix(alignment.getMatrix(), inverseTransform)
+    matrix = alignment.getMatrix()
+    shifts, angles = geometryFromMatrix(matrix, inverseTransform)
 
     alignmentRow.setValue(md.RLN_ORIENT_ORIGIN_X, shifts[0])
     alignmentRow.setValue(md.RLN_ORIENT_ORIGIN_Y, shifts[1])
@@ -291,6 +302,9 @@ def alignmentToRow(alignment, alignmentRow, alignType):
     if is2D:
         angle = angles[0] + angles[2]
         alignmentRow.setValue(md.RLN_ORIENT_PSI,  angle)
+        flip = bool(numpy.linalg.det(matrix[0:2,0:2]) < 0)
+        if flip:
+            print "FLIP in 2D not implemented"
     else:
         alignmentRow.setValue(md.RLN_ORIENT_ORIGIN_Z, shifts[2])
         alignmentRow.setValue(md.RLN_ORIENT_ROT,  angles[0])

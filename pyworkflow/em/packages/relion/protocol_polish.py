@@ -1,6 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
+# * Authors:     Josue Gomez Blanco (jgomez@cnb.csic.es)
+# *              J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # *
 # * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
@@ -34,13 +35,13 @@ from pyworkflow.em.data import Volume
 from pyworkflow.em.protocol import ProtProcessParticles
 
 from protocol_base import ProtRelionBase
-
+from convert import getEnviron
 
 class ProtRelionPolish(ProtProcessParticles, ProtRelionBase):
-    """    
-    Reconstruct a volume using Relion from a given set of particles.
-    The alignment parameters will be converted to a Relion star file
-    and used as direction projections to reconstruct.
+    """
+    This Relion protocol tracks particle movement in movie frames,
+    applies a resolution and dose-dependent weighting scheme
+    for each frame and finally sums them together.
     """
     _label = 'particle polishing'
     
@@ -116,8 +117,7 @@ class ProtRelionPolish(ProtProcessParticles, ProtRelionBase):
                       help='')
         
         form.addParallelSection(threads=0, mpi=3) 
-        #TODO: Add an option to allow the user to decide if copy binary files or not        
-            
+    
     #--------------------------- INSERT steps functions --------------------------------------------  
 
     def _insertAllSteps(self): 
@@ -163,7 +163,7 @@ class ProtRelionPolish(ProtProcessParticles, ProtRelionBase):
         """
         from pyworkflow.utils.path import copyTree
         copyTree(self.refineRun.get()._getExtraPath(), self._getExtraPath())
-        self.runJob(self._getProgram('relion_particle_polish'), params)
+        self.runJob(self._getProgram('relion_particle_polish'), params, env=getEnviron(self.refineRun.get().useRelion14))
     
     def organizeDataStep(self):
         from pyworkflow.utils import moveFile
@@ -216,9 +216,12 @@ class ProtRelionPolish(ProtProcessParticles, ProtRelionBase):
         return summary message for NORMAL EXECUTION. 
         """
         errors = []
+        self.validatePackageVersion('RELION_HOME', errors)
+
         if self.performBfactorWeighting:
             if self.maskForReconstructions.get() is None:
                 errors.append('You should select a *mask* if performing b-factor weighting.')
+
         return errors
     
     def _summary(self):

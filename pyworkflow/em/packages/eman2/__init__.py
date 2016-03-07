@@ -34,11 +34,11 @@ _references = ['Tang2007']
 
 
 from eman2 import *
-from data import *
 from protocol_boxing import EmanProtBoxing
 from protocol_initialmodel import EmanProtInitModel
 from protocol_reconstruct import EmanProtReconstruct
 from protocol_refineasy import EmanProtRefine
+from protocol_autopick import SparxGaussianProtPicking
 from viewer import EmanViewer, RefineEasyViewer
-
+from wizard import SparxGaussianPickerWizard
 _environ = getEnviron()

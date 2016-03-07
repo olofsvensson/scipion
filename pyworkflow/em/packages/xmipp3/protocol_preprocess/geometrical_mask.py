@@ -24,9 +24,6 @@
 # *  e-mail address 'xmipp@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains protocols for creating masks.
-"""
 
 from pyworkflow.protocol.params import IntParam, EnumParam, FloatParam, BooleanParam
 from ..constants import *
@@ -71,7 +68,7 @@ class XmippGeometricalMask3D:
         geo = self.geo.get()
         
         # Create the mask
-        args = '--mask '
+        args = ' --mask '
         r = self.radius.get()
         if r == -1:
             r = size / 2
@@ -190,7 +187,7 @@ class XmippGeometricalMask2D:
         geo = self.geo.get()
         
         # Create the mask
-        args = '--mask '
+        args = ' --mask '
         r = self.radius.get()
         if r == -1:
             r = size / 2

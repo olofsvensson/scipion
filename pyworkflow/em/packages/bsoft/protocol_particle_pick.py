@@ -24,9 +24,6 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains the XmippParticlePicking protocol
-"""
 
 from pyworkflow.em import *  
 from pyworkflow.utils.path import *  
@@ -53,7 +50,7 @@ class BsoftProtParticlePicking(ProtParticlePicking):
                    label='Memory to use (In Gb)', expertLevel=2)    
         
     def _insertAllSteps(self):
-        """The Particle Picking proccess is realized for a set of micrographs"""
+        """The Particle Picking process is realized for a set of micrographs"""
         
         # Get pointer to input micrographs 
         self.inputMics = self.inputMicrographs.get()

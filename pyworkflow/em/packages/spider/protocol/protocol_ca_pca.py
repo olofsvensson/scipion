@@ -23,10 +23,6 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains protocol for 
-Correspondence Analysis or Principal Component Analysis
-"""
 
 from os.path import join
 
@@ -121,7 +117,11 @@ class SpiderProtCAPCA(SpiderProtocol):
         # Insert processing steps
         self._insertFunctionStep('convertInput', 'inputParticles',
                                  self._getFileName('particles'), self._getFileName('particlesSel'))
-        self._insertFunctionStep('convertMaskStep', self.maskType.get())
+        if self.maskType > 0:
+            self._insertFunctionStep('convertMaskStep', self.maskImage.get().getObjId())
+        else:
+            self.maskImage.set(None)
+            
         self._insertFunctionStep('capcaStep', self.analysisType.get(), 
                                  self.numberOfFactors.get(), self.maskType.get())
         self._insertFunctionStep('createOutputStep')

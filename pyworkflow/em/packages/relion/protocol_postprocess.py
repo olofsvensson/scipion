@@ -34,10 +34,9 @@ from pyworkflow.em.packages.relion.protocol_base import ProtRelionBase
 
 
 class ProtRelionPostprocess(ProtAnalysis3D, ProtRelionBase):
-    """    
-    Reconstruct a volume using Relion from a given set of particles.
-    The alignment parameters will be converted to a Relion star file
-    and used as direction projections to reconstruct.
+    """
+    Relion post-processing protocol for automated masking,
+    overfitting estimation, MTF-correction and B-factor sharpening
     """
     _label = 'post-processing'
     
@@ -68,7 +67,7 @@ class ProtRelionPostprocess(ProtAnalysis3D, ProtRelionBase):
                       label='add soft-edge width (px)', condition='doAutoMask',
                       help='The extended binary mask is further extended with a raised-cosine soft'
                            'edge of the specified width.')
-        form.addParam('mask', PointerParam, pointerClass='Mask',
+        form.addParam('mask', PointerParam, pointerClass='VolumeMask',
                       label='Provide a mask', allowsNull=True,
                       condition='not doAutoMask',
                       help='Use this to skip auto-masking by providing your own mask') 
@@ -174,7 +173,6 @@ class ProtRelionPostprocess(ProtAnalysis3D, ProtRelionBase):
         
     #--------------------------- STEPS functions --------------------------------------------
     def postProcessStep(self, params):
-        
         self.runJob('relion_postprocess', params)
         
     def createOutputStep(self):

@@ -23,9 +23,7 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package will contains Spider protocols
-"""
+
 import os
 from os.path import join, dirname, abspath
 import subprocess
@@ -181,7 +179,7 @@ def runCustomMaskScript(filterRadius1, sdFactor,
     
 class SpiderShell(object):
     """ This class will open a child process running Spider interpreter
-    and will keep conection to send commands. 
+    and will keep connection to send commands. 
     """
     def __init__(self, ext='spi', **kwargs):
         self._debug = kwargs.get('debug', True)
@@ -216,7 +214,7 @@ class SpiderShell(object):
         if end:
             self.runCmd("end")
         self._proc.wait()
-        # self._proc.kill() TODO: Check if necesary
+        # self._proc.kill() TODO: Check if necessary
         
 
 class SpiderDocFile(object):

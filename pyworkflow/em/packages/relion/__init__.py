@@ -24,11 +24,10 @@
 # *
 # **************************************************************************
 """
-This sub-package will contains Relion protocols
+This sub-package contains Relion protocols and tools.
 """
 
 from bibtex import _bibtex # Load bibtex dict with references
-
 _logo = "relion_logo.png"
 _references = ['Scheres2012a', 'Scheres2012b', 'Chen2012']
 

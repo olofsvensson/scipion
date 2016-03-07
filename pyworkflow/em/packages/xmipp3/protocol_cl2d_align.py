@@ -23,14 +23,13 @@
 # *  e-mail address 'jgomez@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains wrapper around align2d Xmipp program
-"""
 
 from pyworkflow.em import *  
 
-from convert import writeSetOfParticles, readSetOfParticles, getImageLocation, \
+from convert import writeSetOfParticles, getImageLocation, \
     locationToXmipp, xmippToLocation, matrixFromGeometry
+from pyworkflow.em.packages.xmipp3.convert import createItemMatrix
+import pyworkflow.em as em
        
         
 class XmippProtCL2DAlign(ProtAlign2D):
@@ -84,7 +83,7 @@ class XmippProtCL2DAlign(ProtAlign2D):
 
     #--------------------------- STEPS functions --------------------------------------------        
     def convertInputStep(self):
-        writeSetOfParticles(self.inputParticles.get(),self.imgsFn)
+        writeSetOfParticles(self.inputParticles.get(),self.imgsFn,alignType=constants.ALIGN_NONE)
 
     def createOutputStep(self):
         """ Store the setOfParticles object 
@@ -103,9 +102,15 @@ class XmippProtCL2DAlign(ProtAlign2D):
         alignedSet = self._createSetOfParticles()
         alignedSet.copyInfo(particles)
         alignedSet.setRepresentative(avg)
-        readSetOfParticles(self.imgsFn, alignedSet)
+        alignedSet.copyItems(particles,
+                            updateItemCallback=self._createItemMatrix,
+                            itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
+        alignedSet.setAlignment(constants.ALIGN_2D)
         self._defineOutputs(outputParticles=alignedSet)
         self._defineSourceRelation(self.inputParticles, alignedSet)
+
+    def _createItemMatrix(self, item, row):
+        createItemMatrix(item, row, align=em.ALIGN_2D)
 
     #--------------------------- INFO functions --------------------------------------------
     def _validate(self):

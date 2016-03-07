@@ -23,16 +23,13 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains wrapper around resolution3D Xmipp protocol
-"""
-
 
 from pyworkflow.em import *  
 from pyworkflow.utils import *  
 from math import floor
 from xmipp3 import XmippProtocol
 from convert import createXmippInputVolumes, readSetOfVolumes, locationToXmipp
+from pyworkflow.em.packages.xmipp3.convert import getImageLocation
 import pyworkflow.em.metadata as md
 
 
@@ -53,30 +50,43 @@ class XmippProtResolution3D(ProtAnalysis3D):
         form.addParam('referenceVolume', PointerParam, label="Reference volume", condition='doFSC', 
                       pointerClass='Volume',
                       help='Input volume will be compared to this volume.')  
-        form.addParam('doStructureFactor', BooleanParam, default=True,
-                      label="Calculate Structure Factor?", 
-                      help='If set True calculate Structure Factor')
-        form.addParam('doApplyBFactor', BooleanParam, default=True,
-                      label="Calculate and apply B-factor?",
-                      help='''Sharpen a volume by applying a negative B-factor
-The high-resolution features will enhanced, thereby
-correcting the envelope functions of the microscope,
-detector etc. This implementation follows the
-automated mode based on methodology developed
-by Rosenthal2003''')
+        form.addParam('doComputeBfactor', BooleanParam, default=True,
+                      label="Calculate B-factor?", 
+                      help="If set True the so-called B-factor will be estimated.\n"
+                           "The B-factor can be used to sharpen a volume.\n"
+                           "The high-resolution features will enhanced, thereby\n"
+                           "correcting the envelope functions of the microscope,\n"
+                           "detector etc. This implementation follows the\n"
+                           "automated mode based on methodology developed by Rosenthal2003\n\n"
+                           "*Note*: after finished, you can apply the B-factor through\n"
+                           "   the _Analyze Results_ GUI."
+                      )
 
     #--------------------------- INSERT steps functions --------------------------------------------  
     def _insertAllSteps(self):
         """Insert all steps to calculate the resolution of a 3D reconstruction. """
         
-        self.inputVol = locationToXmipp(*self.inputVolume.get().getLocation())
-        self.refVol = locationToXmipp(*self.referenceVolume.get().getLocation())
+        self.inputVol = getImageLocation(self.inputVolume.get())
+        if self.referenceVolume.hasValue():
+            self.refVol = getImageLocation(self.referenceVolume.get())
         
         if self.doFSC:
             self._insertFunctionStep('calculateFscStep')
-        if self.doStructureFactor:
-            self._insertFunctionStep('structureFactorcStep')
+        if self.doComputeBfactor:
+            self._insertFunctionStep('computeBfactorStep')
+        self._insertFunctionStep('createOutputStep')
         self._insertFunctionStep('createSummaryStep')
+
+    def createOutputStep(self):
+        mData = md.MetaData(self._defineFscName())
+        # Create the FSC object and set the same protocol label
+        fsc = FSC(objLabel=self.getRunName())
+        fsc.loadFromMd(mData,
+                       md.MDL_RESOLUTION_FREQ,
+                       md.MDL_RESOLUTION_FRC)
+        self._defineOutputs(outputFSC=fsc)
+        self._defineSourceRelation(self.referenceVolume,fsc)
+        self._defineSourceRelation(self.inputVolume,fsc)
 
     #--------------------------- STEPS steps functions --------------------------------------------
     def calculateFscStep(self):
@@ -99,7 +109,7 @@ by Rosenthal2003''')
               fscFn, samplingRate)
         self.runJob("xmipp_resolution_fsc", args)
     
-    def structureFactorcStep(self):
+    def computeBfactorStep(self):
         """ Calculate the structure factors of the volume"""
         samplingRate = self.inputVolume.get().getSamplingRate()
         structureFn = self._defineStructFactorName()
@@ -121,7 +131,7 @@ by Rosenthal2003''')
             f=self.calculateDPRResolution(mData,45)
             summary+="   Resolution DPR=45: %3.2f Angstroms\n"%f
             methodsStr+=" The resolution at DPR=45 was %3.2f Angstroms."%f
-        if self.doStructureFactor:
+        if self.doComputeBfactor:
             summary+="Structure factor file: %s\n" % self.getFileTag(self._defineStructFactorName())
         self.methodsVar.set(methodsStr)
         self.summaryVar.set(summary)
@@ -152,7 +162,7 @@ by Rosenthal2003''')
             methodsStr+='We obtained the FSC of the volume %s' % self.getObjectTag('inputVolume')
             methodsStr+=' taking the volume %s' % self.getObjectTag('referenceVolume') + ' as reference.'
             methodsStr+=self.methodsVar.get("")
-        if self.doStructureFactor.get():
+        if self.doComputeBfactor.get():
             fnBfactor= self._getPath('bfactor.txt')
             if os.path.exists(fnBfactor):
                 f = open(fnBfactor)

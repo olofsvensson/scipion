@@ -33,7 +33,8 @@ from protocol_classify_base import SpiderProtClassify
       
 
 class SpiderProtClassifyKmeans(SpiderProtClassify):
-    """ Diday's method, using 'CL CLA' 
+    """ Performs automatic K-Means clustering and classification
+    on factors produced by CA or PCA. Uses the Spider CL KM program
     """
     _label = 'classify kmeans'
     
@@ -86,7 +87,13 @@ class SpiderProtClassifyKmeans(SpiderProtClassify):
             for values in doc.iterValues():
                 imgId = int(values[0])
                 img = particles[imgId]
-                class2D.append(img)
+                if img is None:
+                    print ">>> WARNING: Particle with id '%d' found in docfile, but not in input particles." % imgId
+                else: 
+                    class2D.append(img)
+                
+            # Update information about number of particles in the class
+            classes2D.update(class2D)
                 
         self._defineOutputs(outputClasses=classes2D)
         self._defineSourceRelation(self.inputParticles, classes2D)

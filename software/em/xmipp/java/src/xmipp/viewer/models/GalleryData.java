@@ -261,19 +261,23 @@ public class GalleryData {
         
         useGeo = wrap = false;
         displayLabels = null;
-        mode = Mode.GALLERY_MD;
+
+        if (mode == null)
+            mode = Mode.GALLERY_MD;
         this.renderImages = true;
         displaycis = new HashMap<String, ColumnInfo>();
         this.inverty = parameters.inverty;
+
         if(parameters.getBlock() == null)
             parameters.setBlock(selectedBlock);//Identifies parameters with first block loaded
-        if (parameters.mode.equalsIgnoreCase(Params.OPENING_MODE_METADATA)) 
-            {
-                mode = Mode.TABLE_MD;
-            }
+
+        if (parameters.mode.equalsIgnoreCase(Params.OPENING_MODE_METADATA))
+            mode = Mode.TABLE_MD;
+        else if (parameters.mode.equalsIgnoreCase(Params.OPENING_MODE_GALLERY))
+            mode = Mode.GALLERY_MD;
+
         if(parameters.getBlock().equals(selectedBlock))
         {
-        
             setRenderLabels(parameters.renderLabels);
             setRenderLabel(parameters.getRenderLabel());
             setVisibleLabels(parameters.visibleLabels);
@@ -435,7 +439,7 @@ public class GalleryData {
                     
                 }
                 if (image.isVolume()) { // We are assuming all are volumes
-                    // or images, dont mix it
+                    // or images, don't mix it
                     if (isGalleryMode()) 
                         mode = Mode.GALLERY_VOL;
                     
@@ -659,7 +663,6 @@ public class GalleryData {
      * @return
      */
     public ImageGalleryTableModel createModel(boolean[] selection) {
-    	
         try {
             switch (mode) {
                 case GALLERY_VOL:
@@ -1164,6 +1167,8 @@ public class GalleryData {
     public ColumnInfo getColumnInfo(int col) {
         return labels.get(col);
     }
+    
+    
 
     public String getValueFromCol(int index, int col) {
         if (!isColumnFormat()) {
@@ -1204,7 +1209,6 @@ public class GalleryData {
      * Delete from metadata selected items
      */
     public void removeSelection(boolean[] selection) throws Exception {
-
         for (int i = 0; i < selection.length; i++) {
             if (selection[i]) {
                 md.removeObject(ids[i]);
@@ -1687,16 +1691,18 @@ public class GalleryData {
         }
 
         ColumnInfo aux;
-        int j;
+        int j, k = 0;//k index added to avoid errors if some order columns are not present. This way order index is k not i
         for (int i = 0; i < orderLabels.length; i++) {
+        	j = 0;
             for (ColumnInfo ci : labels) {
                 if (ci.labelName.equals(orderLabels[i])) {
 
-                    aux = labels.get(i);
-                    j = labels.indexOf(ci);
-                    labels.set(i, ci);
+                    aux = labels.get(k);
+                    labels.set(k, ci);
                     labels.set(j, aux);
+                    k ++;
                 }
+                j ++;
             }
         }
     }
@@ -1739,24 +1745,30 @@ public class GalleryData {
             
             String psd = md.getPSDFile(id);
             String psden = md.getPSDEnhanced(id);
-            ImageGeneric img;
-            if(psden != null)
-                img = new ImageGeneric(psden);
-            else
-                img = new ImageGeneric(psd);
-            ImagePlus imp = XmippImageConverter.readToImagePlus(img);
-            
-            
-            if (profile) {
-                if( psden == null)
-                    new CTFAnalyzerJFrame(imp, md.getCTFDescription(id), psd, md.getEllipseCTF(id).getSamplingRate());
+
+            boolean noPsdEnhanced = (psden == null);
+            // Use the same PSD image in case no PSD enhanced
+
+            if (noPsdEnhanced)
+                psden = psd;
+
+            if (profile)
+            {
+                if (noPsdEnhanced)
+                    new CTFAnalyzerJFrame(psden, md.getCTFDescription(id), psd, md.getEllipseCTF(id).getSamplingRate());
                 else
-                    new CTFAnalyzerJFrame(imp, md.getCTFFile(id), psd);
-            } else {
+                    new CTFAnalyzerJFrame(psden, md.getCTFFile(id), psd);
+            }
+            else
+            {
+                ImageGeneric img = new ImageGeneric(psden);
+                ImagePlus imp = XmippImageConverter.readToImagePlus(img);
+                img.destroy();
                 EllipseCTF ctfparams = md.getEllipseCTF(id, imp.getWidth());
                 String sortfn = createSortFile(psd, row);
-                XmippUtil.showImageJ(Tool.VIEWER);// removed Toolbar.FREEROI
-                CTFRecalculateImageWindow ctfiw = new CTFRecalculateImageWindow(this, selection, imp, psd, ctfparams, ctfTasks, row, sortfn);
+                XmippUtil.showImageJ(Tool.VIEWER); // removed Toolbar.FREEROI
+                CTFRecalculateImageWindow ctfiw = new CTFRecalculateImageWindow(this, selection, imp, psd, ctfparams,
+                                                                                ctfTasks, row, sortfn);
             }
 
         } catch (Exception e) {
@@ -1764,16 +1776,22 @@ public class GalleryData {
         }
     }
      
-    public Geometry getGeometry(long id)
+    public Geometry getGeometry(long id, ColumnInfo ci)
     {
-        return getGeometry(id, "2D");
+        return getGeometry(id, "2D", ci);
     }
 
     
-    public Geometry getGeometry(long id, String type)
+    public Geometry getGeometry(long id, String type, ColumnInfo ci)
     {
+        if(md.containsLabel(MDLabel.MDL_IMAGE) && ci.label != MDLabel.MDL_IMAGE)
+        	return null;
         
-        double shiftx, shifty, psiangle;
+        if(md.containsLabel(MDLabel.RLN_IMAGE_NAME) && ci.label != MDLabel.RLN_IMAGE_NAME)
+        	return null;
+        
+        
+        double shiftx, shifty, psiangle, scaleFactor=1;
         boolean flip;
         
         if(md.containsLabel(MetaData.GEOMETRY_LABELS))
@@ -1782,6 +1800,9 @@ public class GalleryData {
 	        shifty = md.getValueDouble(MDLabel.MDL_SHIFT_Y, id);
 	        psiangle = md.getValueDouble(MDLabel.MDL_ANGLE_PSI, id);
 	        flip = md.getValueBoolean(MDLabel.MDL_FLIP, id);
+	        
+	        if(md.containsLabel(MDLabel.MDL_SCALE))
+	        	scaleFactor = md.getValueDouble(MDLabel.MDL_SCALE, id);
         }
         else if(md.containsLabel(MetaData.GEOMETRY_RELION_LABELS))
         {
@@ -1793,7 +1814,7 @@ public class GalleryData {
         else
         	return null;
         
-        return new Geometry(shiftx, shifty, psiangle, flip);
+        return new Geometry(shiftx, shifty, psiangle, flip, scaleFactor);
     }
         
 	public void setRenderLabels(String[] renderLabels) {
@@ -1860,7 +1881,7 @@ public class GalleryData {
                     imageid = imagesmd.addObject();
                     if (useGeo()) 
                     {
-                    	Geometry geo = getGeometry(id);
+                    	Geometry geo = getGeometry(id, ciFirstRender);
                         mdRow = new MDRow();
                         //md.getRow(mdRow, id);//copy geo info in mdRow
                         mdRow.setValueDouble(MDLabel.MDL_SHIFT_X, geo.shiftx);

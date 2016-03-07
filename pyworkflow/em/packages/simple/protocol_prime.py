@@ -23,9 +23,6 @@
 # *  e-mail address 'jgomez@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains wrapper around Prime algorithm in Simple
-"""
 
 import os
 from glob import glob
@@ -180,6 +177,15 @@ class ProtPrime(em.ProtInitialVolume):
         self._defineSourceRelation(self.inputClasses, vol)
 
     #--------------------------- INFO functions --------------------------------------------
+    def _validate(self):
+        from simple import getEnviron
+        errors = []
+        getEnviron()
+        prime = os.environ['SIMPLE_HOME']
+        if not os.path.exists(prime):
+            errors.append('Missing %s' % prime)
+        return errors
+
     def _summary(self):
         summary = []
         summary.append("Input classes: %s" % self.getObjectTag('inputClasses'))

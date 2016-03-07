@@ -23,13 +23,10 @@
 # *  e-mail address 'jgomez@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package contains wrapper around EMAN initialmodel program
-"""
 
 import os
 import pyworkflow.em as em
-from pyworkflow.em.packages.eman2.eman2 import getEmanProgram
+from pyworkflow.em.packages.eman2.eman2 import getEmanProgram, validateVersion
 from pyworkflow.protocol.params import (PointerParam, FloatParam, IntParam, EnumParam,
                                         StringParam, BooleanParam, LEVEL_ADVANCED)
 from pyworkflow.utils.path import cleanPattern, makePath
@@ -94,7 +91,7 @@ class EmanProtReconstruct(ProtReconstruct3D):
         form.addSection(label='Input')
 
         form.addParam('inputParticles', PointerParam, pointerClass='SetOfParticles',
-                      label="Input particles",  
+                      label="Input particles", pointerCondition='hasAlignmentProj', 
                       help='Select the input images from the project.')
         form.addParam('numberOfIterations', IntParam, default=2,
                       label='Number of iterations:',
@@ -119,7 +116,7 @@ class EmanProtReconstruct(ProtReconstruct3D):
                     
         line = form.addLine('Dimensions Volume: ', expertLevel=LEVEL_ADVANCED,
                             help='Defines the dimensions (x,y,z) or (x,x,x) of the '
-                                 'reconstructed volume. If ommitted, implied value based '
+                                 'reconstructed volume. If omitted, implied value based '
                                  'on padded 2D images is used. ')
         line.addParam('dimVolX', IntParam, default=0, label='X')
         line.addParam('dimVolY', IntParam, default=0, label='Y')            
@@ -127,7 +124,7 @@ class EmanProtReconstruct(ProtReconstruct3D):
 
         line = form.addLine('Dimensions to Write Volume: ', expertLevel=LEVEL_ADVANCED,
                             help='Defines the dimensions (x,y,z) or (x,x,x) of the final '
-                                 'volume written to disk, if ommitted, size will be '
+                                 'volume written to disk, if omitted, size will be '
                                  'based on unpadded input size. ')
         line.addParam('dimWriteVolX', IntParam, default=0, label='X')
         line.addParam('dimWriteVolY', IntParam, default=0, label='Y')            
@@ -230,8 +227,10 @@ class EmanProtReconstruct(ProtReconstruct3D):
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):
         errors = []
+        validateVersion(self, errors)
+
         if self.reconstructionMethod.get() > RECON_FOURIER:
-            errors.append("Not implemented yet! Please, choise either back_prjection or fourier method.")
+            errors.append("\nNot implemented yet! Please, choise either back_prjection or fourier method.")
         return errors
     
     def _summary(self):

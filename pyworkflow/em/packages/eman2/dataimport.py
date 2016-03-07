@@ -28,7 +28,7 @@ from os.path import  exists, join, dirname
 
 from pyworkflow.utils.path import getExt
 from pyworkflow.em.data import Coordinate
-from pyworkflow.em.packages.eman2 import loadJson
+from pyworkflow.em.packages.eman2.convert import loadJson
 from pyworkflow.em.metadata import MetaData, MDL_XCOOR, MDL_YCOOR, MDL_PICKING_PARTICLE_SIZE
 
 
@@ -38,14 +38,12 @@ class EmanImport():
         self.protocol = protocol
 
     def importCoordinates(self, fileName, addCoordinate):
-
         if exists(fileName):
             ext = getExt(fileName)
             
             if ext == ".json":
-                print "importando un json"
                 jsonPosDict = loadJson(fileName)
-
+                
                 if jsonPosDict.has_key("boxes"):
                     boxes = jsonPosDict["boxes"]
 
@@ -59,13 +57,17 @@ class EmanImport():
                 md = MetaData()
                 md.readPlain(fileName, "xcoor ycoor particleSize")
                 size = md.getValue(MDL_PICKING_PARTICLE_SIZE, md.firstObject())
-                half = size / 2
-                for objId in md:
-                    x = md.getValue(MDL_XCOOR, objId)
-                    y = md.getValue(MDL_YCOOR, objId)
-                    coord = Coordinate()
-                    coord.setPosition(x+half, y+half)
-                    addCoordinate(coord)
+                if size is None:
+                    print ">>> WARNING: Error parsing coordinate file: %s" % fileName
+                    print "             Skipping this file."
+                else:
+                    half = size / 2
+                    for objId in md:
+                        x = md.getValue(MDL_XCOOR, objId)
+                        y = md.getValue(MDL_YCOOR, objId)
+                        coord = Coordinate()
+                        coord.setPosition(x+half, y+half)
+                        addCoordinate(coord)
             else:
                 raise Exception('Unknown extension "%s" to import Eman coordinates' % ext)
             

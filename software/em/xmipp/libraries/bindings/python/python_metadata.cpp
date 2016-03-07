@@ -281,7 +281,7 @@ PyMethodDef MetaData_methods[] =
         { "getMaxStringLength",
           (PyCFunction) MetaData_getMaxStringLength,
           METH_VARARGS,
-          "Return the maximun lenght of a value on this column(label)" },
+          "Return the maximun length of a value on this column(label)" },
         { "containsLabel",
           (PyCFunction) MetaData_containsLabel,
           METH_VARARGS,
@@ -295,7 +295,7 @@ PyMethodDef MetaData_methods[] =
         { "fillRandom", (PyCFunction) MetaData_fillRandom,
           METH_VARARGS, "Fill a column with random value" },
         { "fillExpand", (PyCFunction) MetaData_fillExpand,
-          METH_VARARGS, "Fill several columns expanding a values from a colum with a path to a row metadata" },
+          METH_VARARGS, "Fill several columns expanding a values from a column with a path to a row metadata" },
         { "copyColumn", (PyCFunction) MetaData_copyColumn,
           METH_VARARGS, "Copy the values of one column to another" },
         { "copyColumnTo", (PyCFunction) MetaData_copyColumnTo,
@@ -1462,7 +1462,7 @@ MetaData_iternext(PyObject *obj)
 PyObject *
 MetaData_sort(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-    int label   =  MDL_IMAGE;
+    int label = MDL_IMAGE;
     PyObject *ascPy = Py_True;
     bool asc=true;
     int limit   = -1;
@@ -1491,17 +1491,22 @@ MetaData_sort(PyObject *obj, PyObject *args, PyObject *kwargs)
 PyObject *
 MetaData_removeDuplicates(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-    try
+    int label = MDL_UNDEFINED;
+
+    if (PyArg_ParseTuple(args, "|i", &label))
     {
-        MetaDataObject *self = (MetaDataObject*) obj;
-        MetaData MDaux = *(self->metadata);
-        self->metadata->clear();
-        self->metadata->removeDuplicates(MDaux);
-        Py_RETURN_NONE;
-    }
-    catch (XmippError &xe)
-    {
-        PyErr_SetString(PyXmippError, xe.msg.c_str());
+        try
+        {
+            MetaDataObject *self = (MetaDataObject*) obj;
+            MetaData MDaux = *(self->metadata);
+            self->metadata->clear();
+            self->metadata->removeDuplicates(MDaux, (MDLabel)label);
+            Py_RETURN_NONE;
+        }
+        catch (XmippError &xe)
+        {
+            PyErr_SetString(PyXmippError, xe.msg.c_str());
+        }
     }
     return NULL;
 }

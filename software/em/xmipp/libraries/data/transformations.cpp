@@ -68,6 +68,8 @@ void geo2TransformationMatrix(const MDRow &imageGeo, Matrix2D<double> &A,
 
     if (scale != 1.)
     {
+    	if (scale==0.) // Protection against badly formed metadatas
+    		scale=1.0;
         if (dim == 2)
         {
             M3x3_BY_CT(A, A, scale);
@@ -414,6 +416,69 @@ void scale3DMatrix(const Matrix1D<double> &sc, Matrix2D<double>& result,
     dMij(result,0, 0) = XX(sc);
     dMij(result,1, 1) = YY(sc);
     dMij(result,2, 2) = ZZ(sc);
+}
+
+#define DELTA_THRESHOLD	10e-7
+bool	getLoopRange( double value, double min, double max, double delta, int loopLimit, int &minIter, int &maxIter)
+{
+	bool validRange=true;		// Return value. TRUE if input value is into range boundaries.
+
+	// Value is under lower boundary.
+	if (value < min)
+	{
+		// If delta is negative -> moving to lower values and never into valid range.
+		if (delta <= DELTA_THRESHOLD)
+		{
+			validRange = false;
+		}
+		// Compute first and last iterations into valid values.
+		else
+		{
+			minIter = (int) (fabs(min - value) / delta);
+			minIter++;
+			maxIter = (int) (fabs(max - value) / delta);
+		}
+	}
+	// Value is over upper boundary.
+	else if (value >= max)
+	{
+		// If delta is negative -> moving to lower values and never into valid range.
+		if (delta >= -DELTA_THRESHOLD)
+		{
+			validRange = false;
+		}
+		// Compute first and last iterations into valid values.
+		else
+		{
+			minIter = (int) (fabs(value - max) / -delta);
+			minIter++;
+			maxIter = (int) (fabs(value - min) / -delta);
+		}
+	}
+	// First value into valid range.
+	else
+	{
+		// Compute first and last iterations into valid values.
+		if (delta > DELTA_THRESHOLD)
+		{
+			minIter = 0;
+			maxIter = (int) (fabs(max - value) / delta);
+		}
+		// Compute first and last iterations into valid values.
+		else if (delta < -DELTA_THRESHOLD)
+		{
+			minIter = 0;
+			maxIter = (int) (fabs(value - min) / -delta);
+		}
+		// If delta is zero then always in valid range.
+		else
+		{
+			minIter = 0;
+			maxIter = loopLimit;
+		}
+	}
+
+	return(validRange);
 }
 
 // Special case for complex numbers

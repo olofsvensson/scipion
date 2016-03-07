@@ -33,12 +33,12 @@ from pyworkflow.gui.dialog import askYesNo
 from pyworkflow.em.protocol import ProtParticlePicking
 
 import eman2
-from pyworkflow.em.packages.eman2.data import loadJson
+from pyworkflow.em.packages.eman2.convert import loadJson
 from convert import readSetOfCoordinates
 
 
 class EmanProtBoxing(ProtParticlePicking):
-    """Protocol to pick particles in a set of micrographs using eman"""
+    """ Picks particles in a set of micrographs using eman2 boxer. """
     _label = 'boxer'
         
     def __init__(self, **args):     
@@ -57,8 +57,8 @@ class EmanProtBoxing(ProtParticlePicking):
 
     #--------------------------- STEPS functions ---------------------------------------------------
     def launchBoxingGUIStep(self):
-        # First we go to runs directory (we create if it does not exist)
-        #path.makePath("runs")
+        # Print the eman version, useful to report bugs
+        self.runJob(eman2.getEmanProgram('e2version.py'), '')
         # Program to execute and it arguments
         program = eman2.getEmanProgram("e2boxer.py")
         arguments = "%(inputMics)s"
@@ -107,6 +107,11 @@ class EmanProtBoxing(ProtParticlePicking):
                 self.runJob(program, arguments % self._params)
 
     #--------------------------- INFO functions ---------------------------------------------------
+    def _validate(self):
+        errors = []
+        eman2.validateVersion(self, errors)
+        return errors
+
     def _warnings(self):
         warnings = []
         firstMic = self.inputMicrographs.get().getFirstItem()

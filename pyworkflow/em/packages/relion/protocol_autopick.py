@@ -102,6 +102,7 @@ class ProtRelionAutopickBase(ProtParticlePicking, ProtRelionBase):
         writeReferences(self.getInputReferences(), self._getPath('input_references'))  
         
     def autopickMicrographStep(self, micStarFile, params, threshold, minDistance, fom):
+        from convert import getEnviron
         """ Launch the 'relion_autopick' for a micrograph with the given parameters. """
         # Call relion_autopick to allow picking of micrographs with different size
         params += ' --i %s' % relpath(micStarFile, self.getWorkingDir())
@@ -128,9 +129,10 @@ class ProtRelionAutopickBase(ProtParticlePicking, ProtRelionBase):
         pwutils.cleanPath(coordPath)
         pwutils.makePath(coordPath)
         import pyworkflow.em.packages.xmipp3 as xmipp3
-        micPath = os.path.join(coordPath, 'micrographs.xmd')
-        xmipp3.writeSetOfMicrographs(micSet, micPath)
-        xmipp3.writeSetOfCoordinates(coordPath, coordSet)
+#         micPath = os.path.join(coordPath, 'micrographs.xmd')
+#         xmipp3.writeSetOfMicrographs(micSet, micPath)
+        micPath = micSet.getFileName()
+        xmipp3.writeSetOfCoordinates(coordPath, coordSet, ismanual=False)
         return micPath, coordPath
         
     def writeXmippOutputCoords(self):
@@ -174,7 +176,6 @@ class ProtRelionAutopickFom(ProtRelionAutopickBase):
     #--------------------------- DEFINE param functions --------------------------------------------   
     def _defineParams(self, form):
         form.addSection(label='Input')
-        
         form.addParam('inputMicrographs', PointerParam, pointerClass='SetOfMicrographs',
                       label='Input micrographs (a few)', important=True,
                       help='Select a set with just a few micrographs to be used\n'
@@ -194,7 +195,7 @@ class ProtRelionAutopickFom(ProtRelionAutopickBase):
                            'so only use images with proper normalization.')
         form.addParam('particleDiameter', IntParam, default=200,
                       label='Particle diameter (A)',
-                      help='') 
+                      help='Provide particle diameter in Angstroms') 
         form.addParam('lowpassFilterRefs', IntParam, default=20,
                       label='Lowpass filter references (A)',
                       help='Lowpass filter that will be applied to the references \n'
@@ -263,10 +264,8 @@ class ProtRelionAutopickFom(ProtRelionAutopickBase):
     #--------------------------- STEPS functions --------------------------------------------
 
     def createOutputStep(self):
-        self.summaryVar.set('This protocol does not generate any output.\n'
-                            'The FOM maps were written to be used later to optimize \n'
-                            'the _Threshold_ and _Inter-particle distance_ \n'
-                            'parameters.')
+        # Does nothing
+        pass
     
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):
@@ -274,9 +273,12 @@ class ProtRelionAutopickFom(ProtRelionAutopickBase):
         return summary message for NORMAL EXECUTION. 
         """
         errors = []
+        self.validatePackageVersion('RELION_HOME', errors)
+
         if self.particleDiameter > self.getInputDimA():
             errors.append('Particle diameter (%d) can not be greater than size (%d)' % 
                           (self.particleDiameter, self.getInputDimA()))
+
         if self.ctfRelations.get() is None and self.refsCtfCorrected:
             errors.append("References CTF corrected parameter must be set to False or set ctf relations.")
             
@@ -286,7 +288,10 @@ class ProtRelionAutopickFom(ProtRelionAutopickBase):
         """ Should be overriden in subclasses to 
         return summary message for NORMAL EXECUTION. 
         """
-        return [self.summaryVar.get('')]
+        summary = ['This protocol does not generate any output.',
+                   'The FOM maps were written to be used later to optimize ',
+                   'the _Threshold_ and _Inter-particle distance_ parameters.']
+        return summary
     
     #--------------------------- UTILS functions --------------------------------------------
     def getInputDimA(self):
@@ -377,6 +382,7 @@ class ProtRelionAutopick(ProtRelionAutopickBase):
         return summary message for NORMAL EXECUTION. 
         """
         errors = []
+        self.validatePackageVersion('RELION_HOME', errors)
         return errors
     
     def _summary(self):
