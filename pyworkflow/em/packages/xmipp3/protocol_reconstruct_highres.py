@@ -149,13 +149,13 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
         line.addParam('angularMaxTilt', FloatParam, label="Max.", default=90, expertLevel=LEVEL_ADVANCED)
         form.addParam('alignmentMethod', EnumParam, label='Image alignment', choices=['Global','Local'], default=self.GLOBAL_ALIGNMENT)
 
-        form.addParam('globalMethod', EnumParam, label="Global alignment method", choices=['Significant','Projection Matching'], default=self.GLOBAL_PROJMATCH, condition='alignmentMethod==0',
+        form.addParam('globalMethod', EnumParam, label="Global alignment method", choices=['Significant','Projection Matching'], default=self.GLOBAL_SIGNIFICANT, condition='alignmentMethod==0',
                   expertLevel=LEVEL_ADVANCED, help="Significant is more accurate but slower.")
         form.addParam('shiftSearch5d', FloatParam, label="Shift search", default=7.0, condition='alignmentMethod==0 and globalMethod==1',
                   expertLevel=LEVEL_ADVANCED, help="In pixels. The next shift is searched from the previous shift plus/minus this amount.")
         form.addParam('shiftStep5d', FloatParam, label="Shift step", default=2.0, condition='alignmentMethod==0 and globalMethod==1', 
 	              expertLevel=LEVEL_ADVANCED, help="In pixels")
-        form.addParam('numberOfReplicates', IntParam, label="Max. Number of Replicates", default=2, condition='alignmentMethod==0',
+        form.addParam('numberOfReplicates', IntParam, label="Max. Number of Replicates", default=3, condition='alignmentMethod==0',
                   expertLevel=LEVEL_ADVANCED, help="Significant alignment is allowed to replicate each image up to this number of times")
 
         form.addParam('contShift', BooleanParam, label="Optimize shifts?", default=True, condition='alignmentMethod==1',
@@ -499,6 +499,13 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
                 fh.write("Average number of directions per used image: %f\n"%(float(Nrepeated)/Nunique))
             fh.close()
     
+    def checkInfoField(self,fnDir,block):
+        fnInfo = join(fnDir,"iterInfo.xmd")
+        if not exists(fnInfo):
+            return False
+        blocks = xmipp.getBlocksInMetaDataFile(fnInfo)
+        return block in blocks
+
     def readInfoField(self,fnDir,block,label):
         mdInfo = xmipp.MetaData("%s@%s"%(block,join(fnDir,"iterInfo.xmd")))
         return mdInfo.getValue(label,mdInfo.firstObject())
@@ -510,6 +517,11 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
         mdInfo.write("%s@%s"%(block,join(fnDir,"iterInfo.xmd")),xmipp.MD_APPEND)
     
     def prepareImages(self,fnDirPrevious,fnDir,TsCurrent,getShiftsFrom=''):
+        if self.checkInfoField(fnDir,"count"):
+            state = self.readInfoField(fnDir, "count", xmipp.MDL_COUNT)
+            if state>=1:
+                return
+        
         print "Preparing images to sampling rate=",TsCurrent
         Xdim=self.inputParticles.get().getDimensions()[0]
         newXdim=long(round(Xdim*self.TsOrig/TsCurrent))
@@ -557,8 +569,14 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
                             (fnImagesi,fnPreviousAngles,fnAux),numberOfMpi=1)
                 self.adaptShifts(fnAux, TsPrevious, fnImagesi, TsCurrent)
             cleanPath(fnAux)
+        self.writeInfoField(fnDir,"count",xmipp.MDL_COUNT,long(1))
         
     def prepareReferences(self,fnDirPrevious,fnDir,TsCurrent,targetResolution):
+        if self.checkInfoField(fnDir,"count"):
+            state = self.readInfoField(fnDir, "count", xmipp.MDL_COUNT)
+            if state>=2:
+                return
+
         print "Preparing references to sampling rate=",TsCurrent
         fnMask=''
         newXdim=self.readInfoField(fnDir,"size",xmipp.MDL_XSIZE)
@@ -597,6 +615,7 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
             
         if fnMask!='':
             cleanPath(fnMask)
+        self.writeInfoField(fnDir,"count",xmipp.MDL_COUNT,long(2))
 
     def prepareMask(self,maskObject,fnMask,TsMaskOut,XdimOut):
         img=ImageHandler()
@@ -683,6 +702,7 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
                                 fnGalleryGroupMd=fnGalleryMd
                             else:
                                 fnGroup=fnImgs
+                                fnGalleryGroup=fnGallery
                                 fnGalleryGroupMd=fnGalleryMd
                             if getSize(fnGroup)==0: # If the group is empty
                                 continue
@@ -997,19 +1017,29 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
     def reconstruct(self, iteration):
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
         TsCurrent=self.readInfoField(fnDirCurrent,"sampling",xmipp.MDL_SAMPLINGRATE)
-        minCTF = getFloatListFromValues(self.minCTF.get(),self.numberOfIterations.get())
+        # minCTF = getFloatListFromValues(self.minCTF.get(),self.numberOfIterations.get())
         for i in range(1,3):
             fnAngles=join(fnDirCurrent,"angles%02d.xmd"%i)
             fnVol=join(fnDirCurrent,"volume%02d.vol"%i)
             if not exists(fnVol):
-                # Reconstruct Fourier
-                args="-i %s -o %s --sym %s --weight --thr %d"%(fnAngles,fnVol,self.symmetryGroup,self.numberOfThreads.get())
+                # Correct for the CTF
+                fnAnglesToUse = fnAngles
                 row=getFirstRow(fnAngles)
-                if row.containsLabel(xmipp.MDL_CTF_DEFOCUSU) or row.containsLabel(xmipp.MDL_CTF_MODEL):
-                    args+=" --useCTF --sampling %f --minCTF %f"%(TsCurrent,minCTF[iteration-self.firstIteration])
+                hasCTF = row.containsLabel(xmipp.MDL_CTF_DEFOCUSU) or row.containsLabel(xmipp.MDL_CTF_MODEL)
+                fnCorrectedImagesRoot=join(fnDirCurrent,"images_corrected%02d"%i)
+                if hasCTF:
+                    args="-i %s -o %s.stk --save_metadata_stack %s.xmd --keep_input_columns"%(fnAngles,fnCorrectedImagesRoot,fnCorrectedImagesRoot)
+                    args+=" --sampling_rate %f --correct_envelope"%TsCurrent
                     if self.inputParticles.get().isPhaseFlipped():
-                        args+=" --phaseFlipped"
+                        args+=" --phase_flipped"
+                    self.runJob("xmipp_ctf_correct_wiener2d",args,numberOfMpi=self.numberOfMpi.get()*self.numberOfThreads.get())
+                    fnAnglesToUse = fnCorrectedImagesRoot+".xmd"
+                    deleteStack = True
+                
+                # Reconstruct Fourier
+                args="-i %s -o %s --sym %s --weight --thr %d"%(fnAnglesToUse,fnVol,self.symmetryGroup,self.numberOfThreads.get())
                 self.runJob("xmipp_reconstruct_fourier",args,numberOfMpi=self.numberOfMpi.get()+1)
+                
             # Reconstruct ADMM
 #            args="-i %s -o %s --sym %s"%(fnAngles,fnVol,self.symmetryGroup)
 #            row=getFirstRow(fnAngles)
@@ -1017,6 +1047,9 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
 #                if not self.inputParticles.get().isPhaseFlipped():
 #                    args+=" --dontUseCTF"
 #            self.runJob("xmipp_reconstruct_admm",args)
+
+                if hasCTF:
+                    cleanPath(fnCorrectedImagesRoot+".*")
     
     def postProcessing(self, iteration):
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
@@ -1087,6 +1120,9 @@ class XmippProtReconstructHighRes(ProtRefine3D, HelicalFinder):
                     cleanPath(join(fnLocal,"anglesCont%02d.stk"%i))
                     cleanPath(join(fnLocal,"anglesDisc%02d.xmd"%i))
                     cleanPath(join(fnLocal,"volumeRef%02d.vol"%i))
+                fnCorrectedImages=join(fnDirCurrent,"images_corrected%02d.stk"%i)
+                if exists(fnCorrectedImages) and iteration!=self.firstIteration+self.numberOfIterations.get()-1:
+                    cleanPath(fnCorrectedImages) # Delete corrected images except for the last iteration
                     #if self.weightResiduals:
                     #    cleanPath(join(fnLocal,"covariance%02d.stk"%i))
                     #    cleanPath(join(fnLocal,"residuals%02i.stk"%i))
