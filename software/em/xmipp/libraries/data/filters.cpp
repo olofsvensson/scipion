@@ -1765,6 +1765,8 @@ void adaptGrayValues(const MultidimArray< double >& Iref, MultidimArray<double> 
     int iter;
     double e;
 	powellOptimizer(p, 1, 2, &adaptGrayValuesL1, &aux, 0.01, e, iter, steps, false);
+	double a=p(0);
+	double b=p(1);
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I)
 		DIRECT_MULTIDIM_ELEM(I,n)=a*DIRECT_MULTIDIM_ELEM(I,n)+b;
 }
