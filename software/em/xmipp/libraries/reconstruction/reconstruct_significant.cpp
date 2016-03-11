@@ -43,7 +43,9 @@ void ProgReconstructSignificant::defineParams()
     addParamsLine("  [--numberOfVolumes <N=1>]    : Number of volumes to reconstruct");
     addParamsLine("  [--initvolumes <md_file=\"\">] : Set of initial volumes. If none is given, a single volume");
     addParamsLine("                               : is reconstructed with random angles assigned to the images");
-    addParamsLine("  [--initgallery <md_file=\"\">]   : Gallery of projections from a single volume");
+    addParamsLine("  [--initgallery <md_file=\"\">]   : Gallery of projections");
+    addParamsLine("                               :+ If several volumes are used, then the projections of each volume");
+    addParamsLine("                               :+ should be a separate block");
     addParamsLine("  [--odir <outputDir=\".\">]   : Output directory");
     addParamsLine("  [--sym <symfile=c1>]         : Enforce symmetry in projections");
     addParamsLine("  [--iter <N=10>]              : Number of iterations");
@@ -601,6 +603,7 @@ void ProgReconstructSignificant::reconstructCurrent()
 void ProgReconstructSignificant::generateProjections()
 {
 	FileName fnGallery, fnGalleryMetaData;
+	StringVector blocks;
 	if (iter>1 || fnFirstGallery=="")
 	{
 		FileName fnVol, fnAngles;
@@ -622,6 +625,8 @@ void ProgReconstructSignificant::generateProjections()
 		}
 		synchronize();
 	}
+	else if (iter==1 && fnFirstGallery!="")
+		getBlocksInMetaDataFile(fnFirstGallery,blocks);
 
 	// Read projection galleries
 	std::vector<GalleryImage> galleryNames;
@@ -640,8 +645,10 @@ void ProgReconstructSignificant::generateProjections()
 		}
 		else
 		{
-			fnGalleryMetaData=fnFirstGallery;
-			fnGallery=fnFirstGallery.replaceExtension("stk");
+			fnGalleryMetaData=blocks[n]+"@"+fnFirstGallery;
+			MDRow row=firstRow(fnGalleryMetaData);
+			row.getValue(MDL_IMAGE,fnGallery);
+			fnGallery=fnGallery.getDecomposedFileName();
 		}
 		MetaData mdAux(fnGalleryMetaData);
 		galleryNames.clear();
@@ -817,7 +824,11 @@ void ProgReconstructSignificant::produceSideinfo()
 			deleteFile(fnInit);
 	}
 	else
-		Nvolumes=1;
+	{
+		StringVector blocks;
+		getBlocksInMetaDataFile(fnFirstGallery,blocks);
+		Nvolumes=blocks.size();
+	}
 	synchronize();
 
 	// Copy all input values as iteration 0 volumes
