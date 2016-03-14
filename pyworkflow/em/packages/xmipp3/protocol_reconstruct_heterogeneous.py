@@ -62,7 +62,8 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         self._defineParamsInput(form, multivolume=True)
         form.addParam('targetResolution', FloatParam, default=8, 
                      label='Target resolution',
-                     help='Target resolution to solve for the heterogeneity')       
+                     help='Target resolution to solve for the heterogeneity')    
+        form.addParam('computeDiff', BooleanParam, default=False, label="Compute the difference volumes")   
         
         form.addSection(label='Next Reference')
         form.addParam('nextSpherical', BooleanParam, label="Spherical mask?", default=True,
@@ -89,9 +90,6 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         line.addParam('angularMaxTilt', FloatParam, label="Max.", default=90, expertLevel=LEVEL_ADVANCED)
         form.addParam('numberOfReplicates', IntParam, label="Max. Number of Replicates", default=3, 
                   expertLevel=LEVEL_ADVANCED, help="Significant alignment is allowed to replicate each image up to this number of times")
-#         form.addHidden('alignmentMethod', EnumParam, label='Image alignment', choices=['Global','Local'], default=self.GLOBAL_ALIGNMENT)
-#         form.addHidden('globalMethod', EnumParam, label="Global alignment method", choices=['Significant','Projection Matching'],
-#                       default=self.GLOBAL_SIGNIFICANT, expertLevel=LEVEL_ADVANCED, help="Significant is more accurate but slower.")
 
         self._defineParamsWeight(form, addJumper=False)
         self._defineParamsPostProcessing(form)
@@ -216,6 +214,36 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
                 fnVol=join(fnDirCurrent,"volume%02d.vol"%i)
                 self.runJob("xmipp_image_operate","-i %s --mult %s"%(fnVol,fnMask),numberOfMpi=1)
             cleanPath(fnMask)
+        
+        if self.computeDiff:
+            for i in range(1,self.getNumberOfReconstructedVolumes()):
+                fnVoli=join(fnDirCurrent,"volume%02d.vol"%i)
+                fnVoliAdjusted=join(fnDirCurrent,"volume%02d_adjusted.vol"%i)
+                for j in range(2,self.getNumberOfReconstructedVolumes()+1):
+                    fnVolj=join(fnDirCurrent,"volume%02d.vol"%j)
+                    fnDiff=join(fnDirCurrent,"diff%02d_%02d.vol"%(j,i))
+
+                    copyFile(fnVoli, fnVoliAdjusted)
+                    self.runJob("xmipp_volume_align","--i1 %s --i2 %s --least_squares --apply %s"%(fnVolj, fnVoliAdjusted, fnVoliAdjusted),numberOfMpi=1)
+                    self.runJob("xmipp_image_operate","-i %s --minus %s -o %s"%(fnVolj, fnVoliAdjusted, fnDiff),numberOfMpi=1)
+                    cleanPath(fnVoliAdjusted)
+        
+        if iteration>1:
+            fnDirPrevious=self._getExtraPath("Iter%03d"%(iteration-1))
+            for i in range(1,self.getNumberOfReconstructedVolumes()+1):
+                fnCurrent=join(fnDirCurrent,"globalAssignment","images_iter001_%02d.xmd"%(i-1))
+                fnPrevious=join(fnDirPrevious,"globalAssignment","images_iter001_%02d.xmd"%(i-1))
+                fnIntersection=self._getExtraPath("intersection.xmd")
+                fnUnion=self._getExtraPath("union.xmd")
+                self.runJob("xmipp_metadata_utilities","-i %s --set intersection %s itemId -o %s"%(fnCurrent,fnPrevious,fnIntersection),numberOfMpi=1)
+                self.runJob("xmipp_metadata_utilities","-i %s --set union %s itemId -o %s"%(fnCurrent,fnPrevious,fnUnion),numberOfMpi=1)
+                
+                sizeIntersection = float(md.getSize(fnIntersection))
+                sizeUnion = float(md.getSize(fnUnion))
+                
+                print("Stability of class %d: %f"%(i,sizeIntersection/sizeUnion))
+                cleanPath(fnIntersection)
+                cleanPath(fnUnion)                
 
     def prepareImages(self,iteration):
         fnDir=self._getPath()
@@ -256,6 +284,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         TsCurrent=self.readInfoField(self._getExtraPath("Iter000"),"sampling",xmipp.MDL_SAMPLINGRATE)
         newXdim=self.readInfoField(self._getExtraPath("Iter000"),"size",xmipp.MDL_XSIZE)
         self.writeInfoField(fnGlobal,"size",xmipp.MDL_XSIZE,newXdim)
+        self.writeInfoField(fnDirCurrent,"size",xmipp.MDL_XSIZE,newXdim)
         self.writeInfoField(fnDirCurrent,"sampling",xmipp.MDL_SAMPLINGRATE,TsCurrent)
         self.prepareReferences(fnDirPrevious,fnGlobal,TsCurrent,self.targetResolution.get())
 
