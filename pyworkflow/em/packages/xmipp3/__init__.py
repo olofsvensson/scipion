@@ -56,6 +56,7 @@ from viewer_split_volume import XmippViewerSplitVolume
 from viewer_validate_overfitting import XmippValidateOverfittingViewer
 from viewer_volume_strain import XmippVolumeStrainViewer
 from viewer_reconstruct_highres import XmippReconstructHighResViewer
+from viewer_solid_angles import SolidAnglesViewer
 
 from plotter import XmippPlotter
 
@@ -99,6 +100,7 @@ from protocol_resolution3d import XmippProtResolution3D
 from protocol_rotational_spectra import XmippProtRotSpectra 
 from protocol_screen_classes import XmippProtScreenClasses
 from protocol_screen_particles import XmippProtScreenParticles
+from protocol_solid_angles import XmippProtSolidAngles
 from protocol_split_volume import XmippProtSplitvolume
 from protocol_validate_nontilt import XmippProtValidateNonTilt
 from protocol_validate_overfitting import XmippProtValidateOverfitting
