@@ -88,7 +88,7 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
                                      anglesFn, self.inputVolume.get().getDim()[0])
         else:
             anglesFn=self.imgsFn
-        self._insertFunctionStep("produceResiduals", vol.getFileName(), anglesFn, vol.getSamplingRate())
+        self._insertFunctionStep("produceResiduals", vol.getFileName(), anglesFn)
         self._insertFunctionStep("evaluateResiduals")
         self._insertFunctionStep("createOutputStep")
 
@@ -100,19 +100,24 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
             writeSetOfClasses2D(imgSet, self.imgsFn, writeParticles=False)
         else:
             writeSetOfParticles(imgSet, self.imgsFn)
+        from pyworkflow.em.convert import ImageHandler
+        img = ImageHandler()
+        fnVol = self._getTmpPath("volume.vol")
+        img.convert(self.inputVolume.get(), fnVol)
+        xdim=self.inputVolume.get().getDim()[0]
+        if xdim!=self._getDimensions():
+            self.runJob("xmipp_image_resize","-i %s --dim %d"%(fnVol,self._getDimensions()))
     
-    def produceResiduals(self):
+    def produceResiduals(self, fnVol, fnAngles):
         anglesOutFn=self._getExtraPath("anglesCont.stk")
         residualsOutFn=self._getExtraPath("residuals.stk")
         projectionsOutFn=self._getExtraPath("projections.stk")
         xdim=self.inputVolume.get().getDim()[0]
         originalTs=self.inputVolume.get().getSamplingRate()
-        Ts=originalTs*xdim/float(self.residualSize.get())
+        Ts=xdim*originalTs/self._getDimensions()
         self.runJob("xmipp_angular_continuous_assign2", "-i %s -o %s --ref %s --optimizeAngles --optimizeGray --optimizeShift --max_shift %d --oresiduals %s --oprojections %s --sampling %f" %\
-                    (self._getExtraPath('images.xmd'),anglesOutFn,self._getExtraPath("volume.vol"),floor(xdim*0.05),residualsOutFn,projectionsOutFn,Ts))
-        fnNewParticles=self._getExtraPath("images.stk")
-        if exists(fnNewParticles):
-            cleanPath(fnNewParticles)
+                    (fnAngles,anglesOutFn,self._getTmpPath("volume.vol"),floor(xdim*0.05),residualsOutFn,projectionsOutFn,Ts))
+
     
     def evaluateResiduals(self):
         # Evaluate each image
