@@ -310,8 +310,6 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
         auxStr="Weights: "
         if self.weightSSNR:
             auxStr+="SSNR "
-        if self.alignmentMethod==self.LOCAL_ALIGNMENT and self.weightContinuous:
-            auxStr+="Continuous "
         if self.weightJumper:
             auxStr+="Jumper"
         summary.append(auxStr)
@@ -345,12 +343,10 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
                 if self.contDefocus:
                     strline+="defocus"
             strline+=". "
-            if self.weightSSNR or (self.weightContinuous and self.alignmentMethod==self.LOCAL_ALIGNMENT) or self.weightJumper:
+            if self.weightSSNR or self.weightJumper:
                 strline+="For reconstruction, we weighted the images according to "
                 if self.weightSSNR:
                     strline+="their SSNR "
-                if self.weightContinuous and self.alignmentMethod==self.LOCAL_ALIGNMENT:
-                    strline+=", their correlation in the continuous alignment "
                 if self.weightJumper:
                     strline+=", and their angular stability"
                 strline+=". "
@@ -1148,9 +1144,9 @@ class XmippProtReconstructHighRes(XmippProtBaseReconstructHighRes, ProtRefine3D)
                 if self.weightSSNR:
                     aux=mdAngles.getValue(xmipp.MDL_WEIGHT_SSNR,objId)
                     weight*=aux
-                if self.weightContinuous and exists(fnAnglesCont) and self.alignmentMethod==self.LOCAL_ALIGNMENT:
-                    aux=mdAngles.getValue(xmipp.MDL_WEIGHT_CONTINUOUS2,objId)
-                    weight*=aux
+#                 if self.weightContinuous and exists(fnAnglesCont) and self.alignmentMethod==self.LOCAL_ALIGNMENT:
+#                     aux=mdAngles.getValue(xmipp.MDL_WEIGHT_CONTINUOUS2,objId)
+#                     weight*=aux
                 if self.weightJumper and iteration>1:
                     w1=mdAngles.getValue(xmipp.MDL_WEIGHT_JUMPER,objId)
                     w2=1.0
