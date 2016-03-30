@@ -310,8 +310,9 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
         auxStr="Weights: "
         if self.weightSSNR:
             auxStr+="SSNR "
-        if self.weightJumper:
-            auxStr+="Jumper"
+        if hasattr(self,"weightJumper"):
+            if self.weightJumper:
+                auxStr+="Jumper"
         summary.append(auxStr)
         if self.postSymmetryWithinMask:
             summary.append("Symmetrizing within mask: "+self.postMaskSymmetry)
@@ -347,8 +348,9 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
                 strline+="For reconstruction, we weighted the images according to "
                 if self.weightSSNR:
                     strline+="their SSNR "
-                if self.weightJumper:
-                    strline+=", and their angular stability"
+                if hasattr(self,"weightJumper"):
+                    if self.weightJumper:
+                        strline+=", and their angular stability"
                 strline+=". "
             if self.postAdHocMask.hasValue():
                 strline+="We masked the reconstruction with %s. "%self.getObjectTag('postAdHocMask')
