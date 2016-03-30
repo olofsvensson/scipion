@@ -43,7 +43,7 @@ class XmippProtSolidAngles(ProtAnalysis3D):
     are assigned to a class. Classes are not exclusive and an image may be assigned to multiple classes
     """
 
-    _label = 'solid_angles'
+    _label = 'solid angles'
     
     def __init__(self, *args, **kwargs):
         ProtAnalysis3D.__init__(self, *args, **kwargs)
