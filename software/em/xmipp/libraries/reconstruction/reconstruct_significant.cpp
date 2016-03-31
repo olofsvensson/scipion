@@ -195,7 +195,8 @@ void ProgReconstructSignificant::alignImagesToGallery()
 	    	for (size_t nVolume=0; nVolume<Nvols; ++nVolume)
 	    	{
 	    		AlignmentTransforms *transforms=galleryTransforms[nVolume];
-		    	for (size_t nDir=0; nDir<Ndirs; ++nDir)
+	    		size_t NdirsThisVolume=mdGallery[nVolume].size();
+		    	for (size_t nDir=0; nDir<NdirsThisVolume; ++nDir)
 				{
 					mCurrentImageAligned=mCurrentImage;
 					mGalleryProjection.aliasImageInStack(gallery[nVolume](),nDir);
@@ -397,6 +398,8 @@ void ProgReconstructSignificant::run()
 
     	size_t Nvols=mdGallery.size();
     	size_t Ndirs=mdGallery[0].size();
+    	for (size_t nVolume=1; nVolume<Nvols; ++nVolume)
+    		Ndirs=std::max(Ndirs,mdGallery[nVolume].size());
     	cc.initZeros(Nimgs,Nvols,Ndirs);
     	weight=cc;
     	double oneAlpha=1-currentAlpha;
@@ -413,6 +416,7 @@ void ProgReconstructSignificant::run()
     		init_progress_bar(Nvols);
 			for (size_t nVolume=0; nVolume<Nvols; ++nVolume)
 			{
+				Ndirs=mdGallery[nVolume].size();
 				for (size_t nDir=0; nDir<Ndirs; ++nDir)
 				{
 					// Look for the best correlation for this direction
