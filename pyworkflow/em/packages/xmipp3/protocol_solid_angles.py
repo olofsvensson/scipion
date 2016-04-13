@@ -110,6 +110,7 @@ class XmippProtSolidAngles(ProtAnalysis3D):
         self.runJob("xmipp_angular_neighbourhood", args % params, numberOfMpi=1)
    
     def classifyGroupsStep(self):
+        from pyworkflow.em.metadata.utils import getSize
         mdOut = xmipp.MetaData()
 
         fnNeighbours = self._getExtraPath("neighbours.xmd")
@@ -120,20 +121,23 @@ class XmippProtSolidAngles(ProtAnalysis3D):
             makePath(fnDir)
             fnOut = join(fnDir,"level_00/class_classes.stk")
             fnRef = "%s@%s"%(imgNo,fnGallery)
-            if not exists(fnOut):
-                args="-i %s@%s --odir %s --ref0 %s --iter 1 --nref 1 --distance correlation --classicalMultiref --maxShift %d"%\
-                    (block,fnNeighbours,fnDir,fnRef,self.maxShift.get())
-                self.runJob("xmipp_classify_CL2D", args)
-                fnAlignRoot = join(fnDir,"classes")
-                self.runJob("xmipp_image_align","-i %s --ref %s --oroot %s --iter 1"%(fnOut,fnRef,fnAlignRoot),numberOfMpi=1)
-                self.runJob("xmipp_transform_geometry","-i %s_alignment.xmd --apply_transform"%fnAlignRoot,numberOfMpi=1)
-
-#             # Construct output metadata
-            objId = mdOut.addObject()
-            mdOut.setValue(xmipp.MDL_REF,int(imgNo),objId)
-            mdOut.setValue(xmipp.MDL_IMAGE,"%s"%fnRef,objId)
-            mdOut.setValue(xmipp.MDL_IMAGE1,"1@%s"%fnOut,objId)
-            mdOut.setValue(xmipp.MDL_CLASS_COUNT,getSize("class000001_images@%s"%join(fnDir,"level_00/class_classes.xmd")),objId)
+            fnBlock = "%s@%s"%(block,fnNeighbours)
+            blockSize = getSize()
+            if blockSize!=0:
+                if not exists(fnOut):
+                    args="-i %s --odir %s --ref0 %s --iter 1 --nref 1 --distance correlation --classicalMultiref --maxShift %d"%\
+                        (fnBlock,fnDir,fnRef,self.maxShift.get())
+                    self.runJob("xmipp_classify_CL2D", args)
+                    fnAlignRoot = join(fnDir,"classes")
+                    self.runJob("xmipp_image_align","-i %s --ref %s --oroot %s --iter 1"%(fnOut,fnRef,fnAlignRoot),numberOfMpi=1)
+                    self.runJob("xmipp_transform_geometry","-i %s_alignment.xmd --apply_transform"%fnAlignRoot,numberOfMpi=1)
+    
+    #           # Construct output metadata
+                objId = mdOut.addObject()
+                mdOut.setValue(xmipp.MDL_REF,int(imgNo),objId)
+                mdOut.setValue(xmipp.MDL_IMAGE,"%s"%fnRef,objId)
+                mdOut.setValue(xmipp.MDL_IMAGE1,"1@%s"%fnOut,objId)
+                mdOut.setValue(xmipp.MDL_CLASS_COUNT,getSize("class000001_images@%s"%join(fnDir,"level_00/class_classes.xmd")),objId)
         fnDirectional=self._getPath("directionalClasses.xmd")
         mdOut.write("classes@"+fnDirectional)
         self.runJob("xmipp_metadata_utilities",'-i %s --operate modify_values "ref=ref+1"'%self._getExtraPath("gallery.doc"), numberOfMpi=1)
