@@ -122,7 +122,7 @@ class XmippProtSolidAngles(ProtAnalysis3D):
             fnOut = join(fnDir,"level_00/class_classes.stk")
             fnRef = "%s@%s"%(imgNo,fnGallery)
             fnBlock = "%s@%s"%(block,fnNeighbours)
-            blockSize = getSize()
+            blockSize = getSize(fnBlock)
             if blockSize!=0:
                 if not exists(fnOut):
                     args="-i %s --odir %s --ref0 %s --iter 1 --nref 1 --distance correlation --classicalMultiref --maxShift %d"%\
