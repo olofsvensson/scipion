@@ -151,7 +151,7 @@ class XmippProtSolidAngles(ProtAnalysis3D):
                 mdClass=xmipp.MetaData("class000001_images@%s"%join(fnDir,"level_00/class_classes.xmd"))
                 mdClass.write("class%s_images@%s"%(imgNo,fnDirectional),xmipp.MD_APPEND)
             except Exception as e:
-                print(e.msg)
+                pass
 
     def createOutputStep(self):
         fnDirectional=self._getPath("directionalClasses.xmd")
