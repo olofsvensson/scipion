@@ -135,10 +135,13 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
 
     def _updateParticle(self, particle, row):
         count = 0
+        print(self.lastRow)
         
         while self.lastRow and particle.getObjId() == self.lastRow.getValue(md.MDL_PARTICLE_ID):
             count += 1
             if count:
+                print("classId",self.lastRow.getValue(md.MDL_REF3D))
+                particle.setClassId(self.lastRow.getValue(md.MDL_REF3D))
                 self._createItemMatrix(particle, self.lastRow)
             try:
                 self.lastRow = next(self.iterMd)
