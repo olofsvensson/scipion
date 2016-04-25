@@ -99,7 +99,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         return len(self.inputVolumes)
     
     #--------------------------- STEPS functions ---------------------------------------------------
-    def createOutput(self, numeroFeo):
+    def createOutput(self):
         # get last iteration
         fnIterDir=glob(self._getExtraPath("Iter*"))
         lastIter=len(fnIterDir)-1
@@ -109,21 +109,24 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         if not exists(fnLastImages):
             raise Exception("The file %s does not exist"%fnLastImages)
         partSet = self.inputParticles.get()
-        Ts=self.readInfoField(self.fnLastDir,"sampling",xmipp.MDL_SAMPLINGRATE)
-        self.scaleFactor=Ts/partSet.getSamplingRate()
+        self.Ts=self.readInfoField(self.fnLastDir,"sampling",xmipp.MDL_SAMPLINGRATE)
+        self.scaleFactor=self.Ts/partSet.getSamplingRate()
 
-        self.iterMd = md.iterRows(fnLastImages, md.MDL_PARTICLE_ID)
-        self.lastRow = next(self.iterMd) 
         classes3D = self._createSetOfClasses3D(partSet)
-        classes3D.classifyItems(updateItemCallback=self._updateParticle,
-                             updateClassCallback=self._updateClass,
-                             itemDataIterator=self.iterMd)
+        # Let use an special iterator to skip missing particles
+        # discarded by classification (in case of cl2d)
+        setMdIter = md.SetMdIterator(fnLastImages,
+                                     sortByLabel=md.MDL_PARTICLE_ID,
+                                     updateItemCallback=self._updateParticle)
+        
+        classes3D.classifyItems(updateItemCallback=setMdIter.updateItem,
+                             updateClassCallback=self._updateClass)
         self._defineOutputs(outputClasses=classes3D)
         self._defineSourceRelation(self.inputParticles, classes3D)
 
         # create a SetOfVolumes and define its relations
         volumes = self._createSetOfVolumes()
-        volumes.setSamplingRate(Ts)
+        volumes.setSamplingRate(self.Ts)
         
         for class3D in classes3D:
             vol = class3D.getRepresentative()
@@ -134,31 +137,19 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         self._defineSourceRelation(self.inputParticles, volumes)
 
     def _updateParticle(self, particle, row):
-        count = 0
-        print(self.lastRow)
-        
-        while self.lastRow and particle.getObjId() == self.lastRow.getValue(md.MDL_PARTICLE_ID):
-            count += 1
-            if count:
-                print("classId",self.lastRow.getValue(md.MDL_REF3D))
-                particle.setClassId(self.lastRow.getValue(md.MDL_REF3D))
-                self._createItemMatrix(particle, self.lastRow)
-            try:
-                self.lastRow = next(self.iterMd)
-            except StopIteration:
-                self.lastRow = None
-                    
-        particle._appendItem = count > 0
-        
-    def _createItemMatrix(self, particle, row):
+        particle.setClassId(row.getValue(md.MDL_REF3D))
         row.setValue(xmipp.MDL_SHIFT_X,row.getValue(xmipp.MDL_SHIFT_X)*self.scaleFactor)
         row.setValue(xmipp.MDL_SHIFT_Y,row.getValue(xmipp.MDL_SHIFT_Y)*self.scaleFactor)
-        setXmippAttributes(particle, row, xmipp.MDL_SHIFT_X, xmipp.MDL_SHIFT_Y, xmipp.MDL_ANGLE_ROT, xmipp.MDL_ANGLE_TILT, xmipp.MDL_ANGLE_PSI, xmipp.MDL_MAXCC, xmipp.MDL_WEIGHT)
+        setXmippAttributes(particle, row, xmipp.MDL_SHIFT_X, 
+                           xmipp.MDL_SHIFT_Y, xmipp.MDL_ANGLE_ROT, 
+                           xmipp.MDL_ANGLE_TILT, xmipp.MDL_ANGLE_PSI, 
+                           xmipp.MDL_MAXCC, xmipp.MDL_WEIGHT)
         createItemMatrix(particle, row, align=em.ALIGN_PROJ)
 
     def _updateClass(self, item):
         classId = item.getObjId()
         item.setAlignment3D()
+        item.setSamplingRate(self.Ts)
         item.getRepresentative().setFileName(join(self.fnLastDir,"volume%02d.vol"%classId))
         
     def doIteration000(self, inputVolumesId):
