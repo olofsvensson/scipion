@@ -154,7 +154,7 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
         self.TsOrig=self.inputParticles.get().getSamplingRate()
         for self.iteration in range(self.firstIteration,self.firstIteration+self.numberOfIterations.get()):
             self.insertIteration(self.iteration)
-        self._insertFunctionStep("createOutput")
+        self._insertFunctionStep("createOutput",2)
     
     def insertIteration(self,iteration):
         if self.alignmentMethod==self.GLOBAL_ALIGNMENT:
