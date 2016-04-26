@@ -144,7 +144,7 @@ class XmippProtDirectionalClasses(ProtAnalysis3D):
             fnOut = join(fnDir,"level_%02d/class_classes.stk"%Nlevels)
             if not exists(fnOut):
                 fnBlock="%s@%s"%(block,fnNeighbours)
-                if getSize(fnBlock)>15:
+                if getSize(fnBlock)>25:
                     args="-i %s --odir %s --ref0 %s@%s --iter %d --nref %d --distance correlation --classicalMultiref --maxShift %d"%\
                         (fnBlock,fnDir,imgNo,fnGallery,self.cl2dIterations.get(),self.directionalClasses.get(),self.maxShift.get())
                     self.runJob("xmipp_classify_CL2D", args)
