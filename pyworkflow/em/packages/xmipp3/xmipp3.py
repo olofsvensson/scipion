@@ -571,7 +571,7 @@ class HelicalFinder():
             args+=" --mask cylinder %d %d"%(-cylinderOuterRadius,-height)
         elif cylinderOuterRadius>0 and cylinderInnerRadius>0:
             args+=" --mask tube %d %d %d"%(-cylinderInnerRadius,-cylinderOuterRadius,-height)
-        self.runJob('xmipp_volume_find_symmetry',args)
+        self.runJob('xmipp_volume_find_symmetry',args,numberOfMpi=1)
 
     def runFineSearch(self, fnVol, dihedral, fnCoarse, fnFine, heightFraction, z0, zF, rot0, rotF, cylinderInnerRadius, cylinderOuterRadius, height, Ts):
         md=MetaData(fnCoarse)
@@ -584,7 +584,7 @@ class HelicalFinder():
             args+=" --mask cylinder %d %d"%(-cylinderOuterRadius,-height)
         elif cylinderOuterRadius>0 and cylinderInnerRadius>0:
             args+=" --mask tube %d %d %d"%(-cylinderInnerRadius,-cylinderOuterRadius,-height)
-        self.runJob('xmipp_volume_find_symmetry',args)
+        self.runJob('xmipp_volume_find_symmetry',args,numberOfMpi=1)
 
     def runSymmetrize(self, fnVol, dihedral, fnParams, fnOut, heightFraction, cylinderInnerRadius, cylinderOuterRadius, height, Ts):
         md=MetaData(fnParams)
@@ -592,7 +592,7 @@ class HelicalFinder():
         rot0=md.getValue(MDL_ANGLE_ROT,objId)
         z0=md.getValue(MDL_SHIFT_Z,objId)
         args="-i %s --sym %s --helixParams %f %f --heightFraction %f -o %s --sampling %f"%(fnVol,self.getSymmetry(dihedral),z0,rot0,heightFraction,fnOut,Ts)
-        self.runJob('xmipp_transform_symmetrize',args)
+        self.runJob('xmipp_transform_symmetrize',args,numberOfMpi=1)
         doMask=False
         if cylinderOuterRadius>0 and cylinderInnerRadius<0:
             args="-i %s --mask cylinder %d %d"%(fnVol,-cylinderOuterRadius,-height)
@@ -601,7 +601,7 @@ class HelicalFinder():
             args="-i %s --mask tube %d %d %d"%(fnVol,-cylinderInnerRadius,-cylinderOuterRadius,-height)
             doMask=True
         if doMask:
-            self.runJob('xmipp_transform_mask',args)
+            self.runJob('xmipp_transform_mask',args,numberOfMpi=1)
             
 
 # ---------------- Legacy code from 'protlib_xmipp.py' ----------------------
