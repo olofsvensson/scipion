@@ -476,9 +476,7 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
                 self.runCoarseSearch(fnVol, dihedral, 0.9, z0, zF, zStep, rot0, rotF, rotStep, 1, fnCoarse, 0, radius, height, TsCurrent)
                 self.runFineSearch(fnVol, dihedral, fnCoarse, fnFine, 0.9, z0, zF, rot0, rotF, 0, radius, height, TsCurrent)
                 cleanPath(fnCoarse)
-                self.runSymmetrize(fnVol, fnFine, fnVol, radius, height)
-                if dihedral:
-                    self.runApplyDihedral(fnVol, fnFine, join(fnDirCurrent,"rotatedHelix.vol"), radius, height)
+                self.runSymmetrize(fnVol, dihedral, fnFine, fnVol, 0.9, 0, radius, height, TsCurrent)
     
             if self.postScript!="":
                 img = ImageHandler()
