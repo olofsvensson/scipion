@@ -462,6 +462,7 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
                     cleanPath(fnMask)
             
             if self.postSymmetryHelical:
+                dihedral=self.postSymmetryHelicalDihedral.get()
                 z0=float(self.postSymmetryHelicalMinZ.get())
                 zF=float(self.postSymmetryHelicalMaxZ.get())
                 zStep=(zF-z0)/10
@@ -472,11 +473,11 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
                 fnFine=join(fnDirCurrent,"fineHelical%02d.xmd"%i)
                 radius=int(self.postSymmetryHelicalRadius.get())
                 height=int(volXdim)
-                self.runCoarseSearch(fnVol, z0, zF, zStep, rot0, rotF, rotStep, 1, fnCoarse, radius, height)
-                self.runFineSearch(fnVol, fnCoarse, fnFine, z0, zF, rot0, rotF, radius, height)
+                self.runCoarseSearch(fnVol, dihedral, 0.9, z0, zF, zStep, rot0, rotF, rotStep, 1, fnCoarse, 0, radius, height, TsCurrent)
+                self.runFineSearch(fnVol, dihedral, fnCoarse, fnFine, 0.9, z0, zF, rot0, rotF, 0, radius, height, TsCurrent)
                 cleanPath(fnCoarse)
                 self.runSymmetrize(fnVol, fnFine, fnVol, radius, height)
-                if self.postSymmetryHelicalDihedral:
+                if dihedral:
                     self.runApplyDihedral(fnVol, fnFine, join(fnDirCurrent,"rotatedHelix.vol"), radius, height)
     
             if self.postScript!="":
