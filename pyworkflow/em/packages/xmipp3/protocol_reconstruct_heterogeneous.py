@@ -209,8 +209,8 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         if iteration>1:
             fnDirPrevious=self._getExtraPath("Iter%03d"%(iteration-1))
             for i in range(1,self.getNumberOfReconstructedVolumes()+1):
-                fnCurrent=join(fnDirCurrent,"images%02d.xmd"%(i-1))
-                fnPrevious=join(fnDirPrevious,"images%02d.xmd"%(i-1))
+                fnCurrent=join(fnDirCurrent,"images%02d.xmd"%i)
+                fnPrevious=join(fnDirPrevious,"images%02d.xmd"%i)
                 fnIntersection=self._getExtraPath("intersection.xmd")
                 fnUnion=self._getExtraPath("union.xmd")
                 self.runJob("xmipp_metadata_utilities","-i %s --set intersection %s itemId -o %s"%(fnCurrent,fnPrevious,fnIntersection),numberOfMpi=1)
