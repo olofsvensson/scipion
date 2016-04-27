@@ -336,8 +336,8 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
                 copyFile(fnAngles,fnGeneralAngles)
                 copyFile(fnImages,fnGeneralImages)
             else:
-                self.runJob('xmipp_metadata_utilities',"-i %s --set union %s"%(fnGeneralAngles,fnAngles),numberOfMpi=1)
-                self.runJob('xmipp_metadata_utilities',"-i %s --set union %s"%(fnGeneralImages,fnImages),numberOfMpi=1)
+                self.runJob('xmipp_metadata_utilities',"-i %s --set union_all %s"%(fnGeneralAngles,fnAngles),numberOfMpi=1)
+                self.runJob('xmipp_metadata_utilities',"-i %s --set union_all %s"%(fnGeneralImages,fnImages),numberOfMpi=1)
 
     def reconstruct(self, iteration):
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
