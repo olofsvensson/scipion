@@ -1437,6 +1437,10 @@ class SetOfClasses(EMSet):
                 if updateItemCallback:
                     row = None if itemDataIterator is None else next(itemDataIterator)
                     updateItemCallback(newItem, row)
+                    # If some item is marked with _appendItem = False
+                    # skip this element from the final result
+                    if not getattr(newItem, "_appendItem", True):
+                        continue
                 ref = newItem.getClassId()
                 if ref is None:
                     raise Exception('Particle classId is None!!!')                    
