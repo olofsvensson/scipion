@@ -114,7 +114,11 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
         groupSymmetry.addParam('postSymmetryWithinMaskMask', PointerParam, label="Mask", pointerClass='VolumeMask', allowsNull=True, condition="postSymmetryWithinMask",
                                help='The mask values must be between 0 (remove these pixels) and 1 (let them pass). Smooth masks are recommended.')
         groupSymmetry.addParam('postSymmetryHelical', BooleanParam, label="Apply helical symmetry?", default=False)
-        groupSymmetry.addParam('postSymmetryHelicalRadius', IntParam, label="Radius", default=-1, condition='postSymmetryHelical',
+        groupSymmetry.addParam('postSymmetryHelicalHeightFraction', FloatParam, label="Height fraction", default=0.9, condition='postSymmetryHelical',
+                               help="In voxels, used to estimate the helical parameters")
+        groupSymmetry.addParam('postSymmetryHelicalInnerRadius', IntParam, label="Inner radius", default=-1, condition='postSymmetryHelical',
+                               help="In voxels")
+        groupSymmetry.addParam('postSymmetryHelicalOuterRadius', IntParam, label="Outer radius", default=-1, condition='postSymmetryHelical',
                                help="In voxels")
         groupSymmetry.addParam('postSymmetryHelicalDihedral', BooleanParam, label="Dihedral symmetry", default=False,
                                condition='postSymmetryHelical')
@@ -471,12 +475,14 @@ class XmippProtBaseReconstructHighRes(EMProtocol, HelicalFinder):
                 rotStep=(rotF-rot0)/10
                 fnCoarse=join(fnDirCurrent,"coarseHelical%02d.xmd"%i)
                 fnFine=join(fnDirCurrent,"fineHelical%02d.xmd"%i)
-                radius=int(self.postSymmetryHelicalRadius.get())
+                heightFraction=self.postSymmetryHelicalHeightFraction.get()
+                innerRadius=int(self.postSymmetryHelicalInnerRadius.get())
+                outerRadius=int(self.postSymmetryHelicalOuterRadius.get())
                 height=int(volXdim)
-                self.runCoarseSearch(fnVol, dihedral, 0.9, z0, zF, zStep, rot0, rotF, rotStep, 1, fnCoarse, 0, radius, height, TsCurrent)
-                self.runFineSearch(fnVol, dihedral, fnCoarse, fnFine, 0.9, z0, zF, rot0, rotF, 0, radius, height, TsCurrent)
+                self.runCoarseSearch(fnVol, dihedral, heightFraction, z0, zF, zStep, rot0, rotF, rotStep, 1, fnCoarse, innerRadius, outerRadius, height, TsCurrent)
+                self.runFineSearch(fnVol, dihedral, fnCoarse, fnFine, heightFraction, z0, zF, rot0, rotF, innerRadius, outerRadius, height, TsCurrent)
                 cleanPath(fnCoarse)
-                self.runSymmetrize(fnVol, dihedral, fnFine, fnVol, 0.9, 0, radius, height, TsCurrent)
+                self.runSymmetrize(fnVol, dihedral, fnFine, fnVol, heightFraction, innerRadius, outerRadius, height, TsCurrent)
     
             if self.postScript!="":
                 img = ImageHandler()
