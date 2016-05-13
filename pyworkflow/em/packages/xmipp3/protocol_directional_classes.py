@@ -95,6 +95,7 @@ class XmippProtDirectionalClasses(ProtAnalysis3D):
         Xdim = self.inputParticles.get().getDimensions()[0]
         Ts = self.inputParticles.get().getSamplingRate()
         newTs = self.targetResolution.get()*0.4
+        newTs = max(Ts,newTs)
         newXdim = Xdim*Ts/newTs
         self.runJob("xmipp_image_resize","-i %s -o %s --save_metadata_stack %s --dim %d"%\
                     (self._getPath('input_particles.xmd'),
