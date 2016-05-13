@@ -709,7 +709,7 @@ void ProgReconstructSignificant::numberOfProjections()
 	angularSampling = angDist[minIndex];
 */
 
-	alpha0 = numOrientationsPerParticle/number_of_projections;
+	alpha0 = numOrientationsPerParticle/(number_of_projections*mdGallery.size());
 	alphaF = alpha0;
 
     if (rank==0)
