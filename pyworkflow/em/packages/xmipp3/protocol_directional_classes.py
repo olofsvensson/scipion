@@ -145,18 +145,24 @@ class XmippProtDirectionalClasses(ProtAnalysis3D):
             if not exists(fnOut):
                 fnBlock="%s@%s"%(block,fnNeighbours)
                 if getSize(fnBlock)>25:
-                    args="-i %s --odir %s --ref0 %s@%s --iter %d --nref %d --distance correlation --classicalMultiref --maxShift %d"%\
-                        (fnBlock,fnDir,imgNo,fnGallery,self.cl2dIterations.get(),self.directionalClasses.get(),self.maxShift.get())
-                    self.runJob("xmipp_classify_CL2D", args)
-                    fnAlignRoot = join(fnDir,"classes")
-                    self.runJob("xmipp_image_align","-i %s --ref %s@%s --oroot %s --iter 1"%(fnOut,imgNo,fnGallery,fnAlignRoot),numberOfMpi=1)
-                    self.runJob("xmipp_transform_geometry","-i %s_alignment.xmd --apply_transform"%fnAlignRoot,numberOfMpi=1)
-
-                    # Construct output metadata
-                    for i in range(self.directionalClasses.get()):
-                        objId = mdOut.addObject()
-                        mdOut.setValue(xmipp.MDL_REF,int(imgNo)-1,objId)
-                        mdOut.setValue(xmipp.MDL_IMAGE,"%d@%s"%(i+1,fnOut),objId)
+                    try:
+                        args="-i %s --odir %s --ref0 %s@%s --iter %d --nref %d --distance correlation --classicalMultiref --maxShift %d"%\
+                            (fnBlock,fnDir,imgNo,fnGallery,self.cl2dIterations.get(),self.directionalClasses.get(),self.maxShift.get())
+                        self.runJob("xmipp_classify_CL2D", args)
+                        fnAlignRoot = join(fnDir,"classes")
+                        self.runJob("xmipp_image_align","-i %s --ref %s@%s --oroot %s --iter 1"%(fnOut,imgNo,fnGallery,fnAlignRoot),numberOfMpi=1)
+                        self.runJob("xmipp_transform_geometry","-i %s_alignment.xmd --apply_transform"%fnAlignRoot,numberOfMpi=1)
+                    
+                        # Construct output metadata
+                        if exists(fnOut):
+                            for i in range(self.directionalClasses.get()):
+                                objId = mdOut.addObject()
+                                mdOut.setValue(xmipp.MDL_REF,int(imgNo)-1,objId)
+                                mdOut.setValue(xmipp.MDL_IMAGE,"%d@%s"%(i+1,fnOut),objId)
+                    except:
+                        print("The classification failed, probably because of a low number of images.")
+                        print("However, this classification does not hinder the protocol to continue")
+                        
         fnDirectional=self._getPath("directionalClasses.xmd")
         mdOut.write(fnDirectional)
         self.runJob("xmipp_metadata_utilities","-i %s --set join %s ref"%(fnDirectional,self._getExtraPath("gallery.doc")), numberOfMpi=1)
