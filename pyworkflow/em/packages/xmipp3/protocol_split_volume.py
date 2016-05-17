@@ -70,7 +70,7 @@ class XmippProtSplitvolume(ProtClassify3D):
 
     #--------------------------- STEPS functions ---------------------------------------------------
     def convertInputStep(self, inputParticlesId):
-        writeSetOfParticles(self.inputParticles.get(),self._getExtraPath("directionalClasses.xmd"))
+        writeSetOfParticles(self.directionalClasses.get(),self._getExtraPath("directionalClasses.xmd"))
 
     def createOutput(self):
         inputParticles = self.directionalClasses.get().outputParticles
