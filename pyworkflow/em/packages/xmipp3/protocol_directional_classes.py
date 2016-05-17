@@ -54,7 +54,7 @@ class XmippProtDirectionalClasses(ProtAnalysis3D):
                       label="Input volume",  
                       help='Select the input volume.')     
         form.addParam('inputParticles', PointerParam, pointerClass='SetOfParticles', 
-                      label="Input particles",  
+                      label="Input particles",   pointerCondition='hasAlignmentProj',
                       help='Select the input projection images with an angular assignment.') 
         form.addParam('symmetryGroup', StringParam, default='c1',
                       label="Symmetry group", 
