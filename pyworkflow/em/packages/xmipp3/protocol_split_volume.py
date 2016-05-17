@@ -28,7 +28,7 @@ Protocol to split a volume in two volumes based on a set of images
 """
 
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
-from pyworkflow.protocol.params import PointerParam, FloatParam, IntParam
+from pyworkflow.protocol.params import PointerParam, FloatParam, IntParam, StringParam
 from pyworkflow.em.protocol import ProtClassify3D
 from pyworkflow.em.data import Volume
 from pyworkflow.em.convert import ImageHandler
