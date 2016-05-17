@@ -73,7 +73,7 @@ class XmippProtSplitvolume(ProtClassify3D):
         writeSetOfParticles(self.directionalClasses.get(),self._getExtraPath("directionalClasses.xmd"))
 
     def createOutput(self):
-        inputParticles = self.directionalClasses.get().outputParticles
+        inputParticles = self.directionalClasses.get()
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate(inputParticles.getSamplingRate())
         for i in range(2):
