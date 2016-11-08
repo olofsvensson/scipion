@@ -162,18 +162,6 @@ void ProgRecFourier::run()
     for ( int nt = 0 ; nt < numThreads ; nt ++ )
         pthread_join(*(th_ids+nt), NULL);
     barrier_destroy( &barrier );
-
-    // Deallocate resources.
-    if ( statusArray != NULL)
-    {
-        free(statusArray);
-    }
-    for (int nt=0; nt<numThreads ;nt++)
-    {
-    	delete(th_args[nt].selFile);
-    }
-    free(th_ids);
-    free(th_args);
 }
 
 
@@ -363,7 +351,7 @@ void * ProgRecFourier::processImageThread( void * threadArgs )
                     if (hasCTF)
                     {
                         threadParams->ctf.readFromMetadataRow(*(threadParams->selFile),objId[threadParams->imageIndex]);
-                        // threadParams->ctf.Tm=threadParams->parent->Ts;
+                        threadParams->ctf.Tm=threadParams->parent->Ts;
                         threadParams->ctf.produceSideInfo();
                     }
 
@@ -487,9 +475,8 @@ void * ProgRecFourier::processImageThread( void * threadArgs )
                 bool assigned;
 
                 // Get the inverse of the sampling rate
-                double iTs=parent->padding_factor_proj/parent->Ts; 
-                //double iTs=1.0/parent->Ts; // The padding factor is not considered here, but later when the indexes
-                //                           // are converted to digital frequencies
+                double iTs=1.0/parent->Ts; // The padding factor is not considered here, but later when the indexes
+                                           // are converted to digital frequencies
                 do
                 {
                     minAssignedRow = -1;
