@@ -154,13 +154,10 @@ class XmippMonoResViewer(ProtocolViewer):
         imgData2 = np.ma.masked_where(imgData < 0.01, imgData, copy=True)
         
         min_Res = np.amin(imgData2)
-<<<<<<< HEAD
-        fig, im = self._plotVolumeSlices('Resolution slices', imgData2,
-                                         min_Res, max_Res, self.getColorMap())
-=======
+
         fig, im = self._plotVolumeSlices('MonoRes slices', imgData2,
                                          min_Res, max_Res, self.getColorMap(), dataAxis=self._getAxis())
->>>>>>> release-1.1
+
         cax = fig.add_axes([0.9, 0.1, 0.03, 0.8])
         cbar = fig.colorbar(im, cax=cax)
         cbar.ax.invert_yaxis()
