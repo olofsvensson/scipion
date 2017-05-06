@@ -125,7 +125,7 @@ class BsoftProtBlocres(ProtAnalysis3D):
     _version = VERSION_1_1
 
     #def __init__(self, **args):
-        #ProtAnalysis3D.__init__(self, **args)
+        ##ProtAnalysis3D.__init__(self, **args)
 
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
