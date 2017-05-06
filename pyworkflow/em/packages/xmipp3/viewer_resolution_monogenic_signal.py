@@ -30,6 +30,7 @@ from protocol_resolution_monogenic_signal import (XmippProtMonoRes,
                                                   OUTPUT_RESOLUTION_FILE_CHIMERA) 
 from pyworkflow.em.viewer_local_resolution import localResolutionViewer
 
+
 class XmippMonoResViewer(localResolutionViewer):
     """
     Visualization tools for MonoRes results.
