@@ -98,6 +98,10 @@ class XmippProtMonoRes(ProtAnalysis3D):
                             help="If the user knows the range of resolutions or only a"
                                  " range of frequency needs to be analysed")
         
+        group.addParam('gaussianAprox', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                      label="Gaussian Approx?",
+                      help='If Noise estimation can be considered gaussian')
+        
         group.addParam('significance', FloatParam, default=0.95, expertLevel=LEVEL_ADVANCED,
                       label="Significance",
                       help='Relution is computed using hipothesis tests, this value determines'
@@ -233,6 +237,8 @@ class XmippProtMonoRes(ProtAnalysis3D):
         params += ' --number_frequencies %f' % Nfreqs
         params += ' --minRes %f' % self.minRes.get()
         params += ' --maxRes %f' % self.maxRes.get()
+        if self.gaussianAprox.get() is False:
+            params += ' --exact'
         params += ' --volumeRadius %f' % xdim
         params += ' --chimera_volume %s' % self._getExtraPath(OUTPUT_RESOLUTION_FILE_CHIMERA)
         params += ' --sym %s' % self.symmetry.get()

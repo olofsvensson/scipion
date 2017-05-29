@@ -524,19 +524,42 @@ void ProgMonogenicSignalRes::run()
 		{
 			if (halfMapsGiven)
 			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+				if (noiseOnlyInHalves)
 				{
-					double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-					double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
-					if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 					{
-						sumS  += amplitudeValue;
-						sumS2 += amplitudeValue*amplitudeValue;
-						noiseValues.push_back(amplitudeValueN);
-						sumN  += amplitudeValueN;
-						sumN2 += amplitudeValueN*amplitudeValueN;
-						++NS;
-						++NN;
+						double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+						double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
+						if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
+						{
+							sumS  += amplitudeValue;
+							sumS2 += amplitudeValue*amplitudeValue;
+							noiseValues.push_back(amplitudeValueN);
+							sumN  += amplitudeValueN;
+							sumN2 += amplitudeValueN*amplitudeValueN;
+							++NS;
+							++NN;
+						}
+					}
+				}
+				else
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+					{
+						double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+						double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
+						if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
+						{
+							sumS  += amplitudeValue;
+							sumS2 += amplitudeValue*amplitudeValue;
+							++NS;
+						}
+						if (DIRECT_MULTIDIM_ELEM(pMask, n) == 0)
+						{
+							sumN  += amplitudeValueN;
+							sumN2 += amplitudeValueN*amplitudeValueN;
+							++NN;
+						}
 					}
 				}
 			}
@@ -594,7 +617,7 @@ void ProgMonogenicSignalRes::run()
 							sumS2 += amplitudeValue*amplitudeValue;
 							++NS;
 						}
-						if (DIRECT_MULTIDIM_ELEM(pMask, n)>=0)
+						if (DIRECT_MULTIDIM_ELEM(pMask, n) == 0)
 						{
 							sumN  += amplitudeValueN;
 							sumN2 += amplitudeValueN*amplitudeValueN;
