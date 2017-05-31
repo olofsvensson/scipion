@@ -83,8 +83,13 @@ class XmippProtMonoRes(ProtAnalysis3D):
                       help='Select a second volume for determining a local resolution.')
 
         form.addParam('Mask', PointerParam, pointerClass='VolumeMask', 
-                      condition='(halfVolumes) or (not halfVolumes)',
+                      condition='(not halfVolumes)',
                       label="Binary Mask", important=True,
+                      help='The mask determines which points are specimen and which ones not')
+
+        form.addParam('MaskHalves', PointerParam, pointerClass='VolumeMask', 
+                      condition='(halfVolumes)',
+                      label="Binary Mask", important=True, AllowsNull = True,
                       help='The mask determines which points are specimen and which ones not')
 
         group = form.addGroup('Extra parameters')
