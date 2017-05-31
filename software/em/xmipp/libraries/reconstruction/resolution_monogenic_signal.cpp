@@ -398,8 +398,10 @@ void ProgMonogenicSignalRes::amplitudeMonogenicSignal3D(MultidimArray< std::comp
 
 
 void ProgMonogenicSignalRes::postProcessingLocalResolutions(MultidimArray<double> &resolutionVol,
-		std::vector<double> &list, MultidimArray<double> &resolutionChimera, double &cut_value, MultidimArray<int> &pMask)
+		std::vector<double> &list, MultidimArray<double> &resolutionChimera,
+		double &cut_value, MultidimArray<int> &pMask)
 {
+	std::cout << "post processing...." << std::endl;
 	MultidimArray<double> resolutionVol_aux = resolutionVol;
 	double last_resolution_2 = sampling/list[(list.size()-1)];
 
@@ -409,6 +411,7 @@ void ProgMonogenicSignalRes::postProcessingLocalResolutions(MultidimArray<double
 		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001)) //the value 0.001 is a tolerance
 			++N;
 
+	std::cout << "post processing...." << std::endl;
 	// Get all resolution values
 	MultidimArray<double> resolutions(N);
 	size_t N_iter=0;
@@ -416,12 +419,13 @@ void ProgMonogenicSignalRes::postProcessingLocalResolutions(MultidimArray<double
 		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001))
 			DIRECT_MULTIDIM_ELEM(resolutions,N_iter++)=DIRECT_MULTIDIM_ELEM(resolutionVol, n);
 	// Sort value and get threshold
+	std::cout << "post processing...." << std::endl;
 	std::sort(&A1D_ELEM(resolutions,0),&A1D_ELEM(resolutions,N));
 	double filling_value = A1D_ELEM(resolutions, (int)(0.5*N)); //median value
 	double trimming_value = A1D_ELEM(resolutions, (int)((1-cut_value)*N));
 
 	double freq, res, init_res, last_res;
-
+	std::cout << "post processing...." << std::endl;
 	init_res = sampling/list[0];
 	last_res = sampling/list[(list.size()-1)];
 	
@@ -748,7 +752,7 @@ void ProgMonogenicSignalRes::run()
 		iter++;
 	} while (doNextIteration);
 
-	if (lefttrimming == false)
+	if ((lefttrimming == false) && (fnMask != ""))
 	{
 	  Nvoxels = 0;
 	  FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
