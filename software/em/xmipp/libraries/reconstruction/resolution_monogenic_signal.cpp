@@ -636,36 +636,34 @@ void ProgMonogenicSignalRes::run()
 		std::cout << "NS/NVoxelsOriginalMask = " << NS/NVoxelsOriginalMask << std::endl;
 		#endif
 		
-		
-		if ( (NS/NVoxelsOriginalMask)<cut_value ) //when the 2.5% is reached then the iterative process stops
+		if (halfMapsGiven && (fnMask == ""))
 		{
-		  std::cout << "Search of resolutions stopped due to mask has been completed" << std::endl;
-		  doNextIteration =false;
-		Nvoxels = 0;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-		{
-		  if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n) == 0)
-		    DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
-		  else
-		  {
-		    Nvoxels++;
-		    DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-//		    if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-//		    {
-//		      DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
-//		    }
-//		    else
-//		      DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-		  }
-		}
-		#ifdef DEBUG_MASK
-		mask.write("partial_mask.vol");
-		#endif
-		lefttrimming = true;
+			continue;
 		}
 		else
 		{
-		
+			if ( (NS/NVoxelsOriginalMask)<cut_value ) //when the 2.5% is reached then the iterative process stops
+			{
+			  std::cout << "Search of resolutions stopped due to mask has been completed" << std::endl;
+			  doNextIteration =false;
+			Nvoxels = 0;
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+			{
+			  if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n) == 0)
+				DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
+			  else
+			  {
+				Nvoxels++;
+				DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
+			  }
+			}
+			#ifdef DEBUG_MASK
+			mask.write("partial_mask.vol");
+			#endif
+			lefttrimming = true;
+			}
+		}
+
 		if (NS == 0)
 		{
 			std::cout << "There are no points to compute inside the mask" << std::endl;
@@ -713,7 +711,7 @@ void ProgMonogenicSignalRes::run()
 						DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n)=DIRECT_MULTIDIM_ELEM(pVfiltered,n);
 				}
 				else{
-				  
+
 					DIRECT_MULTIDIM_ELEM(pMask, n) = DIRECT_MULTIDIM_ELEM(pMask, n) + 1;
 					if (DIRECT_MULTIDIM_ELEM(pMask, n) >2)
 					{
@@ -746,7 +744,7 @@ void ProgMonogenicSignalRes::run()
 			if (resolution <= (minRes-0.001))
 				doNextIteration = false;
 		}
-		}
+
 		iter++;
 	} while (doNextIteration);
 
