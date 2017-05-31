@@ -89,7 +89,7 @@ class XmippProtMonoRes(ProtAnalysis3D):
 
         form.addParam('MaskHalves', PointerParam, pointerClass='VolumeMask', 
                       condition='(halfVolumes)',
-                      label="Binary Mask", important=True, AllowsNull = True,
+                      label="Binary Mask 2", allowsNull = True,
                       help='The mask determines which points are specimen and which ones not')
 
         group = form.addGroup('Extra parameters')
@@ -156,9 +156,13 @@ class XmippProtMonoRes(ProtAnalysis3D):
         if self.halfVolumes:
             self.vol1Fn = self.inputVolume.get().getFileName()
             self.vol2Fn = self.inputVolume2.get().getFileName()
-            self.maskFn = self.Mask.get().getFileName()
+            if not self.MaskHalves.get() is None:
+                self.maskFn = self.MaskHalves.get().getFileName()
+            else:
+                self.maskFn = ''
 
             self.inputVolumes.set(None)
+            self.Mask.set(None)
 
         else:
             self.vol0Fn = self.inputVolumes.get().getFileName()

@@ -105,7 +105,7 @@ class TestMonoRes(TestMonoResBase):
                                    inputVolume=self.protImportHalf1.outputVolume,
                                    inputVolume2=self.protImportHalf2.outputVolume,
                                    provideMaskInHalves=True,
-                                   Mask=self.protCreateMask.outputMask,
+                                   MaskHalves=self.protCreateMask.outputMask,
                                    symmetry='d2',
                                    isPremasked = True,
                                    volumeRadiusHalf = 50,
@@ -133,3 +133,21 @@ class TestMonoRes(TestMonoResBase):
         self.launchProtocol(MonoRes)
         self.assertTrue(exists(MonoRes._getExtraPath(OUTPUT_RESOLUTION_FILE)),
                         "MonoRes filter has failed")
+
+    def testMonoRes4(self):
+        MonoRes = self.newProtocol(XmippProtMonoRes,
+                                   objLabel='two halves No mask',
+                                   halfVolumes=True,
+                                   inputVolume=self.protImportHalf1.outputVolume,
+                                   inputVolume2=self.protImportHalf2.outputVolume,
+                                   provideMaskInHalves=True,
+                                   symmetry='d2',
+                                   isPremasked = True,
+                                   volumeRadiusHalf = 50,
+                                   minRes=1,
+                                   maxRes=25,
+                                   filterInput=False,
+                                   )
+        self.launchProtocol(MonoRes)
+        self.assertTrue(exists(MonoRes._getExtraPath(OUTPUT_RESOLUTION_FILE)),
+                        "MonoRes (split, pre-masked, no filter) has failed")

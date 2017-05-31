@@ -159,21 +159,27 @@ void ProgMonogenicSignalRes::produceSideInfo()
 	{
 		mask.read(fnMask);
 		mask().setXmippOrigin();
+		NVoxelsOriginalMask = 0;
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
+		{
+			if (A3D_ELEM(pMask, k, i, j) == 1)
+				NVoxelsOriginalMask++;
+			if (i*i+j*j+k*k > R*R)
+				A3D_ELEM(pMask, k, i, j) = -1;
+		}
 	}
 	else
 	{
-		std::cout << "Error: a mask ought to be provided" << std::endl;
-		exit(0);
+		mask().initZeros(inputVol);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pMask)
+		{
+			NVoxelsOriginalMask++;
+			DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
+		}
+		std::cout << "There is no mask noise will be estimated by volume difference" << std::endl;
 	}
 
-	NVoxelsOriginalMask = 0;
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
-	{
-		if (A3D_ELEM(pMask, k, i, j) == 1)
-			NVoxelsOriginalMask++;
-		if (i*i+j*j+k*k > R*R)
-			A3D_ELEM(pMask, k, i, j) = -1;
-	}
+
 
 	#ifdef DEBUG_MASK
 	mask.write("mask.vol");
