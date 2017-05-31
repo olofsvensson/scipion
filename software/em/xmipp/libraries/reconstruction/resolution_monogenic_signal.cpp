@@ -182,7 +182,7 @@ void ProgMonogenicSignalRes::produceSideInfo()
 
 
 	#ifdef DEBUG_MASK
-	mask.write("mask.vol");
+	mask.write("mask_original.vol");
 	#endif
 
 	if (halfMapsGiven)
@@ -404,6 +404,7 @@ void ProgMonogenicSignalRes::postProcessingLocalResolutions(MultidimArray<double
 	std::cout << "post processing...." << std::endl;
 	MultidimArray<double> resolutionVol_aux = resolutionVol;
 	double last_resolution_2 = sampling/list[(list.size()-1)];
+	std::cout << "last_res = " << last_resolution_2 << std::endl;
 
 	// Count number of voxels with resolution
 	size_t N=0;
@@ -414,6 +415,7 @@ void ProgMonogenicSignalRes::postProcessingLocalResolutions(MultidimArray<double
 	std::cout << "post processing...." << std::endl;
 	// Get all resolution values
 	MultidimArray<double> resolutions(N);
+	std::cout << "N = " << N << std::endl;
 	size_t N_iter=0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
 		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001))
