@@ -642,11 +642,7 @@ void ProgMonogenicSignalRes::run()
 		std::cout << "NS/NVoxelsOriginalMask = " << NS/NVoxelsOriginalMask << std::endl;
 		#endif
 		
-		if (halfMapsGiven && (fnMask == ""))
-		{
-			continue;
-		}
-		else
+		if ((halfMapsGiven && (fnMask == "")) == false)
 		{
 			if ( (NS/NVoxelsOriginalMask)<cut_value ) //when the 2.5% is reached then the iterative process stops
 			{
@@ -799,14 +795,14 @@ void ProgMonogenicSignalRes::run()
 		outputResolution.write("resolution_simple_simmetrized.vol");
 	#endif
 
-	MultidimArray<double> resolutionFiltered, resolutionChimera;
-	postProcessingLocalResolutions(pOutputResolution, list, resolutionChimera, cut_value, pMask);
+	//MultidimArray<double> resolutionFiltered, resolutionChimera;
+	//postProcessingLocalResolutions(pOutputResolution, list, resolutionChimera, cut_value, pMask);
 
 
 	Image<double> outputResolutionImage;
 	outputResolutionImage() = pOutputResolution;//resolutionFiltered;
 	outputResolutionImage.write(fnOut);
-	outputResolutionImage() = resolutionChimera;
+	outputResolutionImage() = pOutputResolution;
 	outputResolutionImage.write(fnchim);
 
 
@@ -829,6 +825,15 @@ void ProgMonogenicSignalRes::run()
 		Vfiltered().clear();
 	}
 
+	Nvoxels = NVoxelsOriginalMask;
+	
+	if (fnMask == "")
+	{
+	  Image<int> imgMask;
+	  imgMask = pMask;
+	  imgMask.write(fnMaskOut);
+	}
+	
 	MetaData md;
 	size_t objId;
 	objId = md.addObject();
