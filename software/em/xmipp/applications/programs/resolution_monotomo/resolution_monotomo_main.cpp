@@ -27,7 +27,7 @@
 
 int main(int argc, char **argv)
 {
-	ProgMonogenicSignalRes program;
+	ProgMonoTomoRes program;
     program.read(argc, argv);
     return program.tryRun();
 }
