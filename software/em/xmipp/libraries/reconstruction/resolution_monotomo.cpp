@@ -36,7 +36,6 @@ void ProgMonoTomoRes::readParams()
 	fnTomo = getParam("--volume");
 
 	fnOut = getParam("-o");
-	fnMaskOut = getParam("--mask_out");
 	fnchim = getParam("--chimera_volume");
 	sampling = getDoubleParam("--sampling_rate");
 	R = getDoubleParam("--volumeRadius");
