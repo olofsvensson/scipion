@@ -124,10 +124,10 @@ class XmippProtMonoTomo(ProtAnalysis3D):
     def convertInputStep(self):
         """ Read the input volume.
         """
-
-        extVol0 = getExt(self.vol0Fn)
-        if (extVol0 == '.mrc') or (extVol0 == '.map'):
-            self.vol0Fn = self.vol0Fn + ':mrc'
+        if self.tomogram.hasValue():    
+            extVol0 = getExt(self.vol0Fn)
+            if (extVol0 == '.mrc') or (extVol0 == '.map'):
+                self.vol0Fn = self.vol0Fn + ':mrc'
 
         extVol1 = getExt(self.vol1Fn)
         extVol2 = getExt(self.vol2Fn)
