@@ -146,12 +146,11 @@ class XmippProtMonoTomo(ProtAnalysis3D):
             Nfreqs = 50
   
               
-        params = ' --odd_volume %s' % self.vol1Fn
+        params =  ' --odd_volume %s' % self.vol1Fn
         params += ' --even_volume %s' % self.vol2Fn
-        if 
-        params += ' --volume %s' % self._getExtraPath(FN_MEAN_VOL)
+        if self.tomogram is not None:
+            params += ' --volume %s' % self.tomogram.get().getFileName()
 
-        params += ' --mask_out %s' % self._getExtraPath(OUTPUT_MASK_FILE)
         params += ' -o %s' % self._getExtraPath(OUTPUT_RESOLUTION_FILE)
         params += ' --sampling_rate %f' % self.oddVolume.get().getSamplingRate()
         params += ' --number_frequencies %f' % Nfreqs

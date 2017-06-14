@@ -85,11 +85,9 @@ void ProgMonoTomoRes::produceSideInfo()
 	if (fnTomo == ""){
 		V()=0.5*(V1()+V2());
 		V.write("meanVolume.vol");
-		halfMapsGiven = true;
 	}
 	else{
 	    V.read(fnTomo);
-	    halfMapsGiven = false;
 	}
 	V().setXmippOrigin();
 
@@ -478,58 +476,32 @@ void ProgMonoTomoRes::run()
 
 		fnDebug = "Signal";
 
-		amplitudeMonogenicSignal3D(fftV, freq, freqH, freqL, amplitudeMS, iter, fnDebug);
-		if (halfMapsGiven)
-		{
-			fnDebug = "Noise";
-			amplitudeMonogenicSignal3D(*fftN, freq, freqH, freqL, amplitudeMN, iter, fnDebug);
-		}
+		amplitudeMonogenicSignal3D(fftVol, freq, freqH, freqL, amplitudeMS, iter, fnDebug);
+		amplitudeMonogenicSignal3D(fftNoiseVol, freq, freqH, freqL, amplitudeMN, iter, fnDebug);
+
 
 		list.push_back(freq);
 
 		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
 		noiseValues.clear();
 
-		if (halfMapsGiven)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 		{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-				{
-					double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-					double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
-					if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-					{
-						sumS  += amplitudeValue;
-						sumS2 += amplitudeValue*amplitudeValue;
-						++NS;
-					}
-					if (DIRECT_MULTIDIM_ELEM(pMask, n)>=0)
-					{
-						sumN  += amplitudeValueN;
-						sumN2 += amplitudeValueN*amplitudeValueN;
-						++NN;
-					}
-				}
-		}
-			else
+			double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+			double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
+			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
 			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-				{
-					double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-					if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-					{
-						sumS  += amplitudeValue;
-						sumS2 += amplitudeValue*amplitudeValue;
-						++NS;
-					}
-					else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
-					{
-						sumN  += amplitudeValue;
-						sumN2 += amplitudeValue*amplitudeValue;
-						++NN;
-					}
-				}
+				sumS  += amplitudeValue;
+				sumS2 += amplitudeValue*amplitudeValue;
+				++NS;
 			}
-
+			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=0)
+			{
+				sumN  += amplitudeValueN;
+				sumN2 += amplitudeValueN*amplitudeValueN;
+				++NN;
+			}
+		}
 	
 		#ifdef DEBUG
 		std::cout << "NS" << NS << std::endl;
@@ -537,30 +509,6 @@ void ProgMonoTomoRes::run()
 		std::cout << "NS/NVoxelsOriginalMask = " << NS/NVoxelsOriginalMask << std::endl;
 		#endif
 		
-		if ((halfMapsGiven) == false)
-		{
-			if ( (NS/NVoxelsOriginalMask)<cut_value ) //when the 2.5% is reached then the iterative process stops
-			{
-			  std::cout << "Search of resolutions stopped due to mask has been completed" << std::endl;
-			  doNextIteration =false;
-			Nvoxels = 0;
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-			{
-			  if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n) == 0)
-				DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
-			  else
-			  {
-				Nvoxels++;
-				DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-			  }
-			}
-			#ifdef DEBUG_MASK
-			mask.write("partial_mask.vol");
-			#endif
-			lefttrimming = true;
-			}
-		}
-
 		if (NS == 0)
 		{
 			std::cout << "There are no points to compute inside the mask" << std::endl;
