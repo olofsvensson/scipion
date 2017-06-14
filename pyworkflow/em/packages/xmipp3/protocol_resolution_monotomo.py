@@ -49,7 +49,7 @@ class XmippProtMonoTomo(ProtAnalysis3D):
     """    
     Given a map the protocol assigns local resolutions to each voxel of the map.
     """
-    _label = 'local MonoRes'
+    _label = 'local MonoTomo'
     _version = VERSION_1_1
     
     def __init__(self, **args):
@@ -104,10 +104,10 @@ class XmippProtMonoTomo(ProtAnalysis3D):
         self.vol1Fn = self.oddVolume.get().getFileName()
         self.vol2Fn = self.evenVolume.get().getFileName()
         
-        if self.tomogram is None:    
-            self.tomogram.set(None)
-        else:
+        if self.tomogram.hasValue():    
             self.vol0Fn = self.tomogram.get().getFileName()
+        else:
+            self.tomogram.set(None)
 
 
             # Convert input into xmipp Metadata format
@@ -148,8 +148,10 @@ class XmippProtMonoTomo(ProtAnalysis3D):
               
         params =  ' --odd_volume %s' % self.vol1Fn
         params += ' --even_volume %s' % self.vol2Fn
-        if self.tomogram is not None:
+        if self.tomogram.hasValue():
             params += ' --volume %s' % self.tomogram.get().getFileName()
+        else:
+            params += ' --volume '
 
         params += ' -o %s' % self._getExtraPath(OUTPUT_RESOLUTION_FILE)
         params += ' --sampling_rate %f' % self.oddVolume.get().getSamplingRate()
