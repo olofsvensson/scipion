@@ -111,6 +111,11 @@ class XmippProtMonoRes(ProtAnalysis3D):
                       label="Is the original premasked?",
                       help='Sometimes the original volume is masked inside a spherical mask. In this case'
                       'please select yes')
+    
+        form.addParam('NonsphericalMask', PointerParam, pointerClass='VolumeMask', 
+                  condition='isPremasked', expertLevel=LEVEL_ADVANCED,
+                  label="Shape Mask", allowsNull=True,
+                  help='This mask determines where is the noise and the volume')
         
         form.addParam('noiseonlyinhalves', BooleanParam, expertLevel=LEVEL_ADVANCED,
                       default=True,
@@ -205,7 +210,7 @@ class XmippProtMonoRes(ProtAnalysis3D):
   
         if (self.halfVolumes):
             if (self.isPremasked):
-                if (self.volumeRadiusHalf.get() is -1):
+                if (self.volumeRadiusHalf.get() == -1):
                     xdim, _ydim, _zdim = self.inputVolume.get().getDim()
                     xdim = xdim*0.5
                 else:
@@ -215,7 +220,7 @@ class XmippProtMonoRes(ProtAnalysis3D):
                 xdim = xdim*0.5
         else:
             if (self.isPremasked):
-                if (self.volumeRadius.get() is -1):
+                if (self.volumeRadius.get() == -1):
                     xdim, _ydim, _zdim = self.inputVolumes.get().getDim()
                     xdim = xdim*0.5
                 else:
@@ -232,6 +237,9 @@ class XmippProtMonoRes(ProtAnalysis3D):
             params += ' --vol2 %s' % self.vol2Fn
             params += ' --meanVol %s' % self._getExtraPath(FN_MEAN_VOL)
             params += ' --mask %s' % self.maskFn
+        if (self.isPremasked):
+            if (self.NonsphericalMask.get() is not None):
+                params += ' --nonsphericalmask %s' % self.NonsphericalMask.get().getFileName()
         params += ' --mask_out %s' % self._getExtraPath(OUTPUT_MASK_FILE)
         params += ' -o %s' % self._getExtraPath(OUTPUT_RESOLUTION_FILE)
         if (self.halfVolumes):

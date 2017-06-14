@@ -36,6 +36,7 @@ void ProgMonogenicSignalRes::readParams()
 	fnOut = getParam("-o");
 	fnMask = getParam("--mask");
 	fnMaskOut = getParam("--mask_out");
+	fnNonSphericalMask = getParam("--nonsphericalmask");
 	fnchim = getParam("--chimera_volume");
 	sampling = getDoubleParam("--sampling_rate");
 	R = getDoubleParam("--volumeRadius");
@@ -59,6 +60,7 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--mask <vol_file=\"\">]  : Mask defining the macromolecule");
 	addParamsLine("                          :+ If two half volume are given, the noise is estimated from them");
 	addParamsLine("                          :+ Otherwise the noise is estimated outside the mask");
+	addParamsLine("  [--nonsphericalmask <vol_file=\"\">]  : Mask defining noise and volume");
 	addParamsLine("  [--mask_out <vol_file=\"\">]  : sometimes the provided mask is not perfect, and contains voxels out of the particle");
 	addParamsLine("                          :+ Thus the algorithm calculated a tight mask to the volume");
 	addParamsLine("  [--vol2 <vol_file=\"\">]: Half volume 2");
@@ -166,13 +168,29 @@ void ProgMonogenicSignalRes::produceSideInfo()
 		exit(0);
 	}
 
-	NVoxelsOriginalMask = 0;
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
+	Image<int> maskNonspherical;
+	if (fnNonSphericalMask != "")
 	{
-		if (A3D_ELEM(pMask, k, i, j) == 1)
-			NVoxelsOriginalMask++;
-		if (i*i+j*j+k*k > R*R)
-			A3D_ELEM(pMask, k, i, j) = -1;
+		maskNonspherical.read(fnNonSphericalMask);
+		maskNonspherical().setXmippOrigin();
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
+		{
+			if ((A3D_ELEM(maskNonspherical(), k, i, j) * A3D_ELEM(pMask, k, i, j)) == 1)
+				A3D_ELEM(pMask, k, i, j) = 1;
+			if (A3D_ELEM(maskNonspherical(), k, i, j) == 0)
+				A3D_ELEM(pMask, k, i, j) = -1;
+		}
+	}
+	else
+	{
+		NVoxelsOriginalMask = 0;
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
+		{
+			if (A3D_ELEM(pMask, k, i, j) == 1)
+				NVoxelsOriginalMask++;
+			if (i*i+j*j+k*k > R*R)
+				A3D_ELEM(pMask, k, i, j) = -1;
+		}
 	}
 
 	#ifdef DEBUG_MASK
@@ -556,6 +574,7 @@ void ProgMonogenicSignalRes::run()
 						}
 						if (DIRECT_MULTIDIM_ELEM(pMask, n) == 0)
 						{
+							noiseValues.push_back(amplitudeValueN);
 							sumN  += amplitudeValueN;
 							sumN2 += amplitudeValueN*amplitudeValueN;
 							++NN;
@@ -646,7 +665,6 @@ void ProgMonogenicSignalRes::run()
 				}
 			}
 		}
-	
 		#ifdef DEBUG
 		std::cout << "NS" << NS << std::endl;
 		std::cout << "NVoxelsOriginalMask" << NVoxelsOriginalMask << std::endl;
@@ -682,91 +700,91 @@ void ProgMonogenicSignalRes::run()
 		}
 		else
 		{
-		
-		if (NS == 0)
-		{
-			std::cout << "There are no points to compute inside the mask" << std::endl;
-			std::cout << "If the number of computed frequencies is low, perhaps the provided"
-					"mask is not enough tight to the volume, in that case please try another mask" << std::endl;
-			break;
-		}
 
-		double meanS=sumS/NS;
-		double sigma2S=sumS2/NS-meanS*meanS;
-		double meanN=sumN/NN;
-		double sigma2N=sumN2/NN-meanN*meanN;
+			if (NS == 0)
+			{
+				std::cout << "There are no points to compute inside the mask" << std::endl;
+				std::cout << "If the number of computed frequencies is low, perhaps the provided"
+						"mask is not enough tight to the volume, in that case please try another mask" << std::endl;
+				break;
+			}
 
-		if (meanS>max_meanS)
-			max_meanS = meanS;
+			double meanS=sumS/NS;
+			double sigma2S=sumS2/NS-meanS*meanS;
+			double meanN=sumN/NN;
+			double sigma2N=sumN2/NN-meanN*meanN;
 
-		if (meanS<0.001*max_meanS)
-		{
-			std::cout << "Search of resolutions stopped due to too low signal" << std::endl;
-			break;
-		}
+			if (meanS>max_meanS)
+				max_meanS = meanS;
 
-		// Check local resolution
-		double thresholdNoise;
-		if (exactres)
-		{
-			std::sort(noiseValues.begin(),noiseValues.end());
-			thresholdNoise = noiseValues[size_t(noiseValues.size()*significance)];
-		}
-		else
-			thresholdNoise = meanN+criticalZ*sqrt(sigma2N);
+			if (meanS<0.001*max_meanS)
+			{
+				std::cout << "Search of resolutions stopped due to too low signal" << std::endl;
+				break;
+			}
 
-		#ifdef DEBUG
-		  std::cout << "Iteration = " << iter << ",   Resolution= " << resolution << ",   Signal = " << meanS << ",   Noise = " << meanN << ",  Threshold = " << thresholdNoise <<std::endl;
-		#endif
+			// Check local resolution
+			double thresholdNoise;
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-		{
-			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-				if (DIRECT_MULTIDIM_ELEM(amplitudeMS, n)>thresholdNoise)
-				{
-					DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-					DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution;//sampling/freq;
-					if (fnSpatial!="")
-						DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n)=DIRECT_MULTIDIM_ELEM(pVfiltered,n);
-				}
-				else{
-				  
-					DIRECT_MULTIDIM_ELEM(pMask, n) = DIRECT_MULTIDIM_ELEM(pMask, n) + 1;
-					if (DIRECT_MULTIDIM_ELEM(pMask, n) >2)
+			if (exactres)
+			{
+				std::sort(noiseValues.begin(),noiseValues.end());
+				thresholdNoise = noiseValues[size_t(noiseValues.size()*significance)];
+			}
+			else
+				thresholdNoise = meanN+criticalZ*sqrt(sigma2N);
+
+			#ifdef DEBUG
+			  std::cout << "Iteration = " << iter << ",   Resolution= " << resolution << ",   Signal = " << meanS << ",   Noise = " << meanN << ",  Threshold = " << thresholdNoise <<std::endl;
+			#endif
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+			{
+				if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
+					if (DIRECT_MULTIDIM_ELEM(amplitudeMS, n)>thresholdNoise)
 					{
-						DIRECT_MULTIDIM_ELEM(pMask, n) = -1;
-						DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution + counter*R_;//maxRes - counter*R_;
+						DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
+						DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution;//sampling/freq;
+						if (fnSpatial!="")
+							DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n)=DIRECT_MULTIDIM_ELEM(pVfiltered,n);
 					}
-				}
-		}
-		#ifdef DEBUG_MASK
-		FileName fnmask_debug;
-		fnmask_debug = formatString("maske_%i.vol", iter);
-		mask.write(fnmask_debug);
-		#endif
+					else{
 
-		// Is the mean inside the signal significantly different from the noise?
-		double z=(meanS-meanN)/sqrt(sigma2S/NS+sigma2N/NN);
-		#ifdef DEBUG
-			std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
-			std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
-			std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
-			std::cout << "  z=" << z << " (" << criticalZ << ")" << std::endl;
-		#endif
-		if (z<criticalZ)
-		{
-			criticalW = freq;
-			doNextIteration=false;
-		}
-		if (doNextIteration)
-		{
-			if (resolution <= (minRes-0.001))
-				doNextIteration = false;
-		}
+						DIRECT_MULTIDIM_ELEM(pMask, n) = DIRECT_MULTIDIM_ELEM(pMask, n) + 1;
+						if (DIRECT_MULTIDIM_ELEM(pMask, n) >2)
+						{
+							DIRECT_MULTIDIM_ELEM(pMask, n) = -1;
+							DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution + counter*R_;//maxRes - counter*R_;
+						}
+					}
+			}
+			#ifdef DEBUG_MASK
+			FileName fnmask_debug;
+			fnmask_debug = formatString("maske_%i.vol", iter);
+			mask.write(fnmask_debug);
+			#endif
+
+			// Is the mean inside the signal significantly different from the noise?
+			double z=(meanS-meanN)/sqrt(sigma2S/NS+sigma2N/NN);
+			#ifdef DEBUG
+				std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
+				std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
+				std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
+				std::cout << "  z=" << z << " (" << criticalZ << ")" << std::endl;
+			#endif
+			if (z<criticalZ)
+			{
+				criticalW = freq;
+				doNextIteration=false;
+			}
+			if (doNextIteration)
+			{
+				if (resolution <= (minRes-0.001))
+					doNextIteration = false;
+			}
 		}
 		iter++;
 	} while (doNextIteration);
-
 	if (lefttrimming == false)
 	{
 	  Nvoxels = 0;
