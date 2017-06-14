@@ -36,7 +36,6 @@ void ProgMonoTomoRes::readParams()
 	fnTomo = getParam("--volume");
 
 	fnOut = getParam("-o");
-	fnMask = getParam("--mask");
 	fnMaskOut = getParam("--mask_out");
 	fnchim = getParam("--chimera_volume");
 	sampling = getDoubleParam("--sampling_rate");
@@ -46,8 +45,6 @@ void ProgMonoTomoRes::readParams()
 	fnSym = getParam("--sym");
 	N_freq = getDoubleParam("--number_frequencies");
 	trimBound = getDoubleParam("--trimmed");
-	noiseOnlyInHalves = checkParam("--noiseonlyinhalves");
-	fnSpatial = getParam("--filtered_volume");
 	significance = getDoubleParam("--significance");
 	fnMd = getParam("--md_outputdata");
 }
@@ -57,11 +54,6 @@ void ProgMonoTomoRes::defineParams()
 {
 	addUsageLine("This function determines the local resolution of a map");
 	addParamsLine("  --odd_volume <vol_file=\"\">   : Input volume");
-	addParamsLine("  [--mask <vol_file=\"\">]  : Mask defining the macromolecule");
-	addParamsLine("                          :+ If two half volume are given, the noise is estimated from them");
-	addParamsLine("                          :+ Otherwise the noise is estimated outside the mask");
-	addParamsLine("  [--mask_out <vol_file=\"\">]  : sometimes the provided mask is not perfect, and contains voxels out of the particle");
-	addParamsLine("                          :+ Thus the algorithm calculated a tight mask to the volume");
 	addParamsLine("  [--even_volume <vol_file=\"\">]: Half volume 2");
 	addParamsLine("  [-o <output=\"MGresolution.vol\">]: Local resolution volume (in Angstroms)");
 	addParamsLine("  [--volume <vol_file=\"\">]: Mean volume of half1 and half2 (only it is neccesary the two haves are used)");
@@ -69,20 +61,18 @@ void ProgMonoTomoRes::defineParams()
 	addParamsLine("  [--chimera_volume <output=\"Chimera_resolution_volume.vol\">]: Local resolution volume for chimera viewer (in Angstroms)");
 	addParamsLine("  [--sampling_rate <s=1>]   : Sampling rate (A/px)");
 	addParamsLine("                            : Use -1 to disable this option");
-	addParamsLine("  [--volumeRadius <s=100>]   : This parameter determines the radius of a sphere where the volume is");
 	addParamsLine("  [--number_frequencies <w=50>]       : The resolution is computed at a number of frequencies between mininum and");
 	addParamsLine("                            : maximum resolution px/A. This parameter determines that number");
 	addParamsLine("  [--minRes <s=30>]         : Minimum resolution (A)");
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--trimmed <s=0.5>]       : Trimming percentile");
-	addParamsLine("  [--noiseonlyinhalves]     : The noise estimation is only performed inside the mask");
-	addParamsLine("  [--filtered_volume <vol_file=\"\">]       : The input volume is locally filtered at local resolutions.");
 	addParamsLine("  [--significance <s=0.95>]    : The level of confidence for the hypothesis test.");
 	addParamsLine("  [--md_outputdata <file=\".\">]  : It is a control file. The provided mask can contain voxels of noise.");
 	addParamsLine("                                  : Moreover, voxels inside the mask cannot be measured due to an unsignificant");
 	addParamsLine("                                  : SNR. Thus, a new mask is created. This metadata file, shows, the number of");
 	addParamsLine("                                  : voxels of the original mask, and the created mask");
 }
+
 
 void ProgMonoTomoRes::produceSideInfo()
 {
@@ -113,9 +103,6 @@ void ProgMonoTomoRes::produceSideInfo()
 	noiseVolume = V1()/2;
 	V1.clear();
 	V2.clear();
-
-	if (fnSpatial!="")
-		VresolutionFiltered().initZeros(V());
 
 	//Fourier transform slice by slice
 	size_t Ydim, Xdim, Zdim, Ndim, Ydim_aux, Xdim_aux, Zdim_aux, Ndim_aux;
@@ -169,7 +156,6 @@ void ProgMonoTomoRes::produceSideInfo()
 		{
 			FFT_IDX2DIGFREQ(j,XSIZE(inputVol),ux);
 			u2=uy2+ux*ux;
-
 			if ((i != 0) || (j != 0))
 				DIRECT_A2D_ELEM(iu,i,j) = 1.0/sqrt(u2);
 			else
@@ -251,9 +237,6 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		filteredvolume = VRiesz;
 		filteredvolume.write(formatString("Volumen_filtrado_%i.vol", count));
 		#endif
-
-		if (fnSpatial!="")
-			Vfiltered()=VRiesz;
 
 		#ifdef DEBUG
 		FileName iternumber;
@@ -509,25 +492,6 @@ void ProgMonoTomoRes::run()
 
 		if (halfMapsGiven)
 		{
-			if (noiseOnlyInHalves)
-			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-				{
-					double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-					double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
-					if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-					{
-						sumS  += amplitudeValue;
-						sumS2 += amplitudeValue*amplitudeValue;
-						++NS;
-						sumN  += amplitudeValueN;
-						sumN2 += amplitudeValueN*amplitudeValueN;
-						++NN;
-					}
-				}
-			}
-			else
-			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 				{
 					double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
@@ -545,7 +509,6 @@ void ProgMonoTomoRes::run()
 						++NN;
 					}
 				}
-			}
 		}
 			else
 			{
@@ -574,7 +537,7 @@ void ProgMonoTomoRes::run()
 		std::cout << "NS/NVoxelsOriginalMask = " << NS/NVoxelsOriginalMask << std::endl;
 		#endif
 		
-		if ((halfMapsGiven && (fnMask == "")) == false)
+		if ((halfMapsGiven) == false)
 		{
 			if ( (NS/NVoxelsOriginalMask)<cut_value ) //when the 2.5% is reached then the iterative process stops
 			{
@@ -676,33 +639,7 @@ void ProgMonoTomoRes::run()
 		iter++;
 	} while (doNextIteration);
 
-	if ((lefttrimming == false) && (fnMask != ""))
-	{
-	  Nvoxels = 0;
-	  FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-	  {
-	    if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n) == 0)
-	      DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
-	    else
-	    {
-	      Nvoxels++;
-	      DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-//	      if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-//	      {
-//	    	  //DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
-//	    	  DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-//	      }
-//	      else
-//	      {
-////	    	  DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-//	    	  DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
-//	      }
-	    }
-	  }
-	#ifdef DEBUG_MASK
-	  //mask.write(fnMaskOut);
-	#endif
-	}
+
 	amplitudeMN.clear();
 	amplitudeMS.clear();
 
@@ -736,29 +673,9 @@ void ProgMonoTomoRes::run()
 		outputResolution.write("resolution_simple.vol");
 	#endif
 
-	if (fnSpatial!="")
-	{
-		mask.read(fnMask);
-		mask().setXmippOrigin();
-		Vfiltered.read(fnTomo);
-		pVfiltered=Vfiltered();
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pVfiltered)
-		if (DIRECT_MULTIDIM_ELEM(pMask,n)==1)
-			DIRECT_MULTIDIM_ELEM(pVfiltered,n)-=DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n);
-		Vfiltered.write(fnSpatial);
-
-		VresolutionFiltered().clear();
-		Vfiltered().clear();
-	}
 
 	Nvoxels = NVoxelsOriginalMask;
 	
-	if (fnMask == "")
-	{
-	  Image<int> imgMask;
-	  imgMask = pMask;
-	  imgMask.write(fnMaskOut);
-	}
 	
 	MetaData md;
 	size_t objId;
