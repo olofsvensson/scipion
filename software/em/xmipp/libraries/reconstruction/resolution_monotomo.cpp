@@ -120,9 +120,10 @@ void ProgMonoTomoRes::produceSideInfo()
 	fftVol.setSlice(0, fftSlice_aux);
 	fftNoiseVol.setSlice(0, fftNoise_aux);
 	std::cout << "antes del for" << std::endl;
-	std::cout << "Zdim = " << Zdim << std::endl;
-	std::cout << "Zdim = " << Zdim_aux << std::endl;
-	for (size_t j = 1; j< Zdim_aux; j++)
+	std::cout << "Xdim = " << Xdim << "Ydim = " << Ydim << "Zdim = " << Zdim << std::endl;
+	std::cout << "Zdim_aux = " << Zdim_aux << std::endl;
+	fftVol.printShape();
+	for (size_t j = 1; j< Zdim; j++)
 	{
 		std::cout << "iter = " << j << std::endl;
 		myvolume.getSlice(j, slice);
