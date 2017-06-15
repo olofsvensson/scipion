@@ -108,10 +108,8 @@ void ProgMonoTomoRes::produceSideInfo()
 
 	const MultidimArray<double> &myvolume = inputVol;
 	const MultidimArray<double> &mynoise = noiseVolume;
-	std::cout << "aqui " << std::endl;
 	myvolume.getSlice(0, slice);
-	std::cout << "aqui " << std::endl;
-	sliceNoise.aliasImageInStack(mynoise,0);
+	mynoise.getSlice(0, sliceNoise);
 	aux_slice = slice;
 	aux_noise = sliceNoise;
 
@@ -121,21 +119,22 @@ void ProgMonoTomoRes::produceSideInfo()
 	fftSlice_aux.getDimensions(Xdim_aux, Ydim_aux, Zdim_aux, Ndim_aux);
 	fftVol.initZeros(1, Zdim, Ydim_aux, Xdim_aux);
 	fftNoiseVol = fftVol;
-	fftSlice.aliasImageInStack(fftVol,0);
-	fftNoise.aliasImageInStack(fftNoiseVol,0);
+	fftVol.setSlice(0, fftSlice);
+	fftNoiseVol.setSlice(0, fftNoise);
 	std::cout << "aqui " << std::endl;
 	fftSlice = fftSlice_aux;
 	fftNoise = fftNoise_aux;
 	for (size_t j = 1; j< Zdim; j++)
 	{
-		slice.aliasImageInStack(myvolume,j);
-		sliceNoise.aliasImageInStack(mynoise,j);
+		myvolume.getSlice(j, slice);
+		mynoise.getSlice(j, sliceNoise);
 		aux_slice = slice;
 		aux_noise = sliceNoise;
 		transformer.FourierTransform(aux_slice, fftSlice_aux);
 		transformer2.FourierTransform(aux_noise, fftNoise_aux);
-		fftSlice.aliasImageInStack(fftVol,j);
-		fftNoise.aliasImageInStack(fftNoiseVol,j);
+
+		fftVol.setSlice(j, fftSlice);
+		fftNoiseVol.setSlice(j, fftNoise);
 		fftSlice = fftSlice_aux;
 		fftNoise = fftNoise_aux;
 	}
