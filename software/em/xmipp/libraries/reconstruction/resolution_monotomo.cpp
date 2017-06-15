@@ -208,8 +208,15 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	myfftV.getDimensions(Xdim, Ydim, Zdim_aux, Ndim);
 //	std::cout << "xdim = " << Xdim << "  Ydim = " << Ydim << std::endl;
 	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	std::cout << "--------------" << std::endl;
+	VRiesz.printShape();
 	amplitudeVol.resizeNoCopy(Xdim, Ydim, Zdim_aux, Ndim);
+	std::cout << "--------------" << std::endl;
+	amplitudeVol.printShape();
+	std::cout << "--------------" << std::endl;
 	amplitude.initZeros(VRiesz);
+	amplitude.printShape();
+	std::cout << "--------------" << std::endl;
 	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
 	std::cout << Zdim_aux << std::endl;
