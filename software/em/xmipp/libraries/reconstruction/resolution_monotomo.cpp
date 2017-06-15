@@ -205,8 +205,10 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	myfftV.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
+	std::cout << Zdim << std::endl;
 	for (size_t ss = 0; ss < Zdim; ss++)
 	{
+		std::cout << ss << std::endl;
 		myfftV.getSlice(ss, fftSlice);
 		long n=0;
 		fftVRiesz.initZeros(fftSlice);
