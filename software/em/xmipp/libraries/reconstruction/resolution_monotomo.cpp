@@ -26,7 +26,7 @@
 
 #include "resolution_monotomo.h"
 
-#define DEBUG
+//#define DEBUG
 //#define DEBUG_MASK
 
 void ProgMonoTomoRes::readParams()
