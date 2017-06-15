@@ -116,12 +116,15 @@ void ProgMonoTomoRes::produceSideInfo()
 	fftSlice_aux.getDimensions(Xdim_aux, Ydim_aux, Zdim_aux, Ndim_aux);
 	fftVol.initZeros(1, Zdim, Ydim_aux, Xdim_aux);
 	fftNoiseVol = fftVol;
-	std::cout << "antes del set" << std::endl;
+	std::cout << "antes del s" << std::endl;
 	fftVol.setSlice(0, fftSlice_aux);
 	fftNoiseVol.setSlice(0, fftNoise_aux);
 	std::cout << "antes del for" << std::endl;
-	for (size_t j = 1; j< Zdim; j++)
+	std::cout << "Zdim = " << Zdim << std::endl;
+	std::cout << "Zdim = " << Zdim_aux << std::endl;
+	for (size_t j = 1; j< Zdim_aux; j++)
 	{
+		std::cout << "iter = " << j << std::endl;
 		myvolume.getSlice(j, slice);
 		mynoise.getSlice(j, sliceNoise);
 		transformer.FourierTransform(slice, fftSlice_aux);
