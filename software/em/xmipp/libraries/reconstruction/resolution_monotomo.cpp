@@ -108,8 +108,9 @@ void ProgMonoTomoRes::produceSideInfo()
 
 	const MultidimArray<double> &myvolume = inputVol;
 	const MultidimArray<double> &mynoise = noiseVolume;
-
-	slice.aliasImageInStack(myvolume,0);
+	std::cout << "aqui " << std::endl;
+	myvolume.getSlice(0, slice);
+	std::cout << "aqui " << std::endl;
 	sliceNoise.aliasImageInStack(mynoise,0);
 	aux_slice = slice;
 	aux_noise = sliceNoise;
@@ -122,6 +123,7 @@ void ProgMonoTomoRes::produceSideInfo()
 	fftNoiseVol = fftVol;
 	fftSlice.aliasImageInStack(fftVol,0);
 	fftNoise.aliasImageInStack(fftNoiseVol,0);
+	std::cout << "aqui " << std::endl;
 	fftSlice = fftSlice_aux;
 	fftNoise = fftNoise_aux;
 	for (size_t j = 1; j< Zdim; j++)
