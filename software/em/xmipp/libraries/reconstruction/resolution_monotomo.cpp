@@ -304,7 +304,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		std::cout << "llego_3" << std::endl;
 
 		// Calculate second component of Riesz vector
-		fftVRiesz.initZeros(myfftV);
+		fftVRiesz.initZeros(fftSlice);
 		n=0;
 
 		std::cout << "llego_4 ANTES FOR" << std::endl;
