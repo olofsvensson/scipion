@@ -102,6 +102,7 @@ void ProgMonoTomoRes::produceSideInfo()
 	//Fourier transform slice by slice
 	size_t Ydim, Xdim, Zdim, Ndim, Ydim_aux, Xdim_aux, Zdim_aux, Ndim_aux;
 	inputVol.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	inputVol.printShape();
 
 	MultidimArray<double> slice, sliceNoise, aux_slice, aux_noise;
 	MultidimArray< std::complex<double> > fftSlice, fftNoise, fftSlice_aux, fftNoise_aux;
