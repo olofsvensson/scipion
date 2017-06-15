@@ -110,35 +110,25 @@ void ProgMonoTomoRes::produceSideInfo()
 	const MultidimArray<double> &mynoise = noiseVolume;
 	myvolume.getSlice(0, slice);
 	mynoise.getSlice(0, sliceNoise);
-	aux_slice = slice;
-	aux_noise = sliceNoise;
-
 	FourierTransformer transformer, transformer2;
-	transformer.FourierTransform(aux_slice, fftSlice_aux);
-	transformer2.FourierTransform(aux_noise, fftNoise_aux);
+	transformer.FourierTransform(slice, fftSlice_aux);
+	transformer2.FourierTransform(sliceNoise, fftNoise_aux);
 	fftSlice_aux.getDimensions(Xdim_aux, Ydim_aux, Zdim_aux, Ndim_aux);
 	fftVol.initZeros(1, Zdim, Ydim_aux, Xdim_aux);
 	fftNoiseVol = fftVol;
-	fftVol.setSlice(0, fftSlice);
-	fftNoiseVol.setSlice(0, fftNoise);
-	std::cout << "aqui " << std::endl;
-	fftSlice = fftSlice_aux;
-	fftNoise = fftNoise_aux;
+	fftVol.setSlice(0, fftSlice_aux);
+	fftNoiseVol.setSlice(0, fftNoise_aux);
+
 	for (size_t j = 1; j< Zdim; j++)
 	{
 		myvolume.getSlice(j, slice);
 		mynoise.getSlice(j, sliceNoise);
-		aux_slice = slice;
-		aux_noise = sliceNoise;
-		transformer.FourierTransform(aux_slice, fftSlice_aux);
-		transformer2.FourierTransform(aux_noise, fftNoise_aux);
-
-		fftVol.setSlice(j, fftSlice);
-		fftNoiseVol.setSlice(j, fftNoise);
-		fftSlice = fftSlice_aux;
-		fftNoise = fftNoise_aux;
+		transformer.FourierTransform(slice, fftSlice_aux);
+		transformer2.FourierTransform(sliceNoise, fftNoise_aux);
+		fftVol.setSlice(j, fftSlice_aux);
+		fftNoiseVol.setSlice(j, fftNoise_aux);
 	}
-
+	std::cout << "llego" << std::endl;
 
 	// Calculate u and first component of Riesz vector
 	double uy, uy2, ux, uz2, u2;
