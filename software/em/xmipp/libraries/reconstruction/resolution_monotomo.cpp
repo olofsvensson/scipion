@@ -192,6 +192,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	MultidimArray<double>  amplitude;
 	amplitudeVol.resizeNoCopy(VRiesz);
 
+
 	std::complex<double> J(0,1);
 
 	// Filter the input volume and add it to amplitude
@@ -202,8 +203,9 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 	MultidimArray< std::complex<double> > fftSlice;
 	size_t Xdim, Ydim, Zdim, Ndim;
-	myfftV.getDimensions(Xdim, Ydim, Zdim, Ndim);
-	std::cout << "xdim = " << Xdim << "  Ydim = " << Ydim << std::endl;
+//	myfftV.getDimensions(Xdim, Ydim, Zdim, Ndim);
+//	std::cout << "xdim = " << Xdim << "  Ydim = " << Ydim << std::endl;
+	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	amplitude.initZeros(Xdim, Ydim);
 	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
