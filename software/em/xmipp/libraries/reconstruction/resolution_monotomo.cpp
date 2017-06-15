@@ -203,10 +203,11 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	MultidimArray< std::complex<double> > fftSlice;
 	size_t Xdim, Ydim, Zdim, Ndim;
 	myfftV.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
 	for (size_t ss = 0; ss < Zdim; ss++)
 	{
-		myfftV.getSlice(fftSlice,ss);
+		myfftV.getSlice(ss, fftSlice);
 		long n=0;
 		fftVRiesz.initZeros(fftSlice);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(fftSlice)
@@ -340,7 +341,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		saveImg2.clear();
 		#endif // DEBUG
 
-		amplitudeVol.aliasImageInStack(amplitude,ss);
+		amplitudeVol.setSlice(ss, amplitude);
 	}
 }
 
