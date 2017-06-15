@@ -210,7 +210,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	std::cout << "--------------" << std::endl;
 	VRiesz.printShape();
-	amplitudeVol.resizeNoCopy(Xdim, Ydim, Zdim_aux, Ndim);
+	amplitudeVol.resizeNoCopy(Ndim, Zdim_aux, Ydim, Xdim);
 	std::cout << "--------------" << std::endl;
 	amplitudeVol.printShape();
 	std::cout << "--------------" << std::endl;
