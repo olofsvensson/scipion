@@ -91,7 +91,8 @@ void ProgMonoTomoRes::produceSideInfo()
 	//Defining the volume
 	MultidimArray<double> &inputVol = V();
 	MultidimArray<double> noiseVolume;
-	VRiesz.resizeNoCopy(inputVol);
+
+
 
 	//Defining the noise
 	V1()-=V2();
@@ -111,6 +112,9 @@ void ProgMonoTomoRes::produceSideInfo()
 	const MultidimArray<double> &mynoise = noiseVolume;
 	myvolume.getSlice(0, slice);
 	mynoise.getSlice(0, sliceNoise);
+
+	VRiesz.resizeNoCopy(slice);
+
 	FourierTransformer transformer, transformer2;
 	transformer.FourierTransform(slice, fftSlice_aux);
 	transformer2.FourierTransform(sliceNoise, fftNoise_aux);
@@ -190,8 +194,6 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 	//fftVRiesz.initZeros(myfftV);
 	MultidimArray<double>  amplitude;
-	amplitudeVol.resizeNoCopy(VRiesz);
-
 
 	std::complex<double> J(0,1);
 
@@ -202,15 +204,16 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	double ideltal=PI/(w1-w1l);
 
 	MultidimArray< std::complex<double> > fftSlice;
-	size_t Xdim, Ydim, Zdim, Ndim;
-//	myfftV.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	size_t Xdim, Ydim, Zdim, Ndim, Zdim_aux;
+	myfftV.getDimensions(Xdim, Ydim, Zdim_aux, Ndim);
 //	std::cout << "xdim = " << Xdim << "  Ydim = " << Ydim << std::endl;
 	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
-	amplitude.initZeros(Xdim, Ydim);
+	amplitudeVol.resizeNoCopy(Xdim, Ydim, Zdim_aux, Ndim);
+	amplitude.initZeros(VRiesz);
 	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
-	std::cout << Zdim << std::endl;
-	for (size_t ss = 0; ss < Zdim; ss++)
+	std::cout << Zdim_aux << std::endl;
+	for (size_t ss = 0; ss < Zdim_aux; ss++)
 	{
 		std::cout << ss << std::endl;
 		myfftV.getSlice(ss, fftSlice);
