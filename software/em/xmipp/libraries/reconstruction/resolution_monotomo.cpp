@@ -240,7 +240,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		}
 
 		transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
-
+		std::cout << "llego" << std::endl;
 		#ifdef DEBUG
 		Image<double> filteredvolume;
 		filteredvolume = VRiesz;
@@ -262,6 +262,8 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
 		DIRECT_MULTIDIM_ELEM(amplitude,n)=DIRECT_MULTIDIM_ELEM(VRiesz,n)*DIRECT_MULTIDIM_ELEM(VRiesz,n);
+
+		std::cout << "llego" << std::endl;
 
 		// Calculate first component of Riesz vector
 		fftVRiesz.initZeros(fftSlice);
@@ -292,14 +294,20 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 					++n;
 				}
 		}
+
+		std::cout << "llego_3" << std::endl;
+
 		transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
 		DIRECT_MULTIDIM_ELEM(amplitude,n)+=DIRECT_MULTIDIM_ELEM(VRiesz,n)*DIRECT_MULTIDIM_ELEM(VRiesz,n);
+
+		std::cout << "llego_3" << std::endl;
 
 		// Calculate second component of Riesz vector
 		fftVRiesz.initZeros(myfftV);
 		n=0;
 
+		std::cout << "llego_4 ANTES FOR" << std::endl;
 		for(size_t i=0; i<YSIZE(fftSlice); ++i)
 		{
 			FFT_IDX2DIGFREQ(i,YSIZE(amplitude),uy);
@@ -324,12 +332,16 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 					++n;
 				}
 		}
+
+		std::cout << "llego_4" << std::endl;
 		transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
 		{
 			DIRECT_MULTIDIM_ELEM(amplitude,n)+=DIRECT_MULTIDIM_ELEM(VRiesz,n)*DIRECT_MULTIDIM_ELEM(VRiesz,n);
 			DIRECT_MULTIDIM_ELEM(amplitude,n)=sqrt(DIRECT_MULTIDIM_ELEM(amplitude,n));
 		}
+
+		std::cout << "llego_4" << std::endl;
 		#ifdef DEBUG
 		if (fnDebug.c_str() != "")
 		{
@@ -342,8 +354,10 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		#endif // DEBUG
 	//
 		// Low pass filter the monogenic amplitude
+		std::cout << "prefilter " << std::endl;
 		lowPassFilter.w1 = w1;
 		amplitude.setXmippOrigin();
+		std::cout << "Pre apliy mask" << std::endl;
 		lowPassFilter.applyMaskSpace(amplitude);
 
 		#ifdef DEBUG
@@ -356,8 +370,11 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		}
 		saveImg2.clear();
 		#endif // DEBUG
-
+		
+		std::cout << "llego_end" << std::endl;
 		amplitudeVol.setSlice(ss, amplitude);
+                std::cout << "llego_end" << std::endl;
+
 	}
 }
 
