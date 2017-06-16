@@ -193,16 +193,16 @@ class XmippProtMonoTomo(ProtAnalysis3D):
     def createOutputStep(self):
         volume_path = self._getExtraPath(OUTPUT_RESOLUTION_FILE)
         self.volumesSet = self._createSetOfVolumes('resolutionVol')
-        if self.tomogram is None:
-            self.volumesSet.setSamplingRate(self.oddVolume.get().getSamplingRate())
-        else:
+        if self.tomogram.hasValue():
             self.volumesSet.setSamplingRate(self.tomogram.get().getSamplingRate())
+        else:
+            self.volumesSet.setSamplingRate(self.oddVolume.get().getSamplingRate())
         readSetOfVolumes(volume_path, self.volumesSet)
         self._defineOutputs(outputVolume=self.volumesSet)
-        if (self.tomogram is None):
-            self._defineSourceRelation(self.oddVolume, self.volumesSet)
-        else:
+        if (self.tomogram.hasValue()):
             self._defineSourceRelation(self.tomogram, self.volumesSet)
+        else:
+            self._defineSourceRelation(self.oddVolume, self.volumesSet)
             
         #Setting the min max for the summary
         imageFile = self._getExtraPath(OUTPUT_RESOLUTION_FILE_CHIMERA)
