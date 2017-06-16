@@ -121,10 +121,8 @@ void ProgMonoTomoRes::produceSideInfo()
 	fftSlice_aux.getDimensions(Xdim_aux, Ydim_aux, Zdim_aux, Ndim_aux);
 	fftVol.initZeros(1, Zdim, Ydim_aux, Xdim_aux);
 	fftNoiseVol = fftVol;
-	std::cout << "antes del s" << std::endl;
 	fftVol.setSlice(0, fftSlice_aux);
 	fftNoiseVol.setSlice(0, fftNoise_aux);
-	std::cout << "antes del for" << std::endl;
 	std::cout << "Xdim = " << Xdim << "Ydim = " << Ydim << "Zdim = " << Zdim << std::endl;
 	std::cout << "Zdim_aux = " << Zdim_aux << std::endl;
 	fftVol.printShape();
@@ -432,7 +430,7 @@ void ProgMonoTomoRes::run()
 	produceSideInfo();
 
 	Image<double> outputResolution;
-	outputResolution().initZeros(VRiesz);
+	outputResolution().initZeros(mask());
 
 	MultidimArray<int> &pMask = mask();
 	MultidimArray<double> &pOutputResolution = outputResolution();
