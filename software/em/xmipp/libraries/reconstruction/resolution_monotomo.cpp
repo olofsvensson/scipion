@@ -222,7 +222,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	std::cout << Zdim_aux << std::endl;
 	for (size_t ss = 0; ss < Zdim_aux; ss++)
 	{
-		std::cout << ss << std::endl;
+		//std::cout << ss << std::endl;
 		myfftV.getSlice(ss, fftSlice);
 		long n=0;
 		fftVRiesz.initZeros(fftSlice);
@@ -556,6 +556,7 @@ void ProgMonoTomoRes::run()
 		  std::cout << "Iteration = " << iter << ",   Resolution= " << resolution << ",   Signal = " << meanS << ",   Noise = " << meanN << ",  Threshold = " << thresholdNoise <<std::endl;
 		#endif
 
+		std::cout << "calculating is is higher than threshold" << std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 		{
 			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
@@ -563,8 +564,6 @@ void ProgMonoTomoRes::run()
 				{
 					DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
 					DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution;//sampling/freq;
-					if (fnSpatial!="")
-						DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n)=DIRECT_MULTIDIM_ELEM(pVfiltered,n);
 				}
 				else{
 
@@ -576,6 +575,7 @@ void ProgMonoTomoRes::run()
 					}
 				}
 		}
+		std::cout << "after if it is higher than threshold" << std::endl;
 		#ifdef DEBUG_MASK
 		FileName fnmask_debug;
 		fnmask_debug = formatString("maske_%i.vol", iter);
