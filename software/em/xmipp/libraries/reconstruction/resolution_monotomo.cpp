@@ -128,6 +128,7 @@ void ProgMonoTomoRes::produceSideInfo()
 	std::cout << "Xdim = " << Xdim << "Ydim = " << Ydim << "Zdim = " << Zdim << std::endl;
 	std::cout << "Zdim_aux = " << Zdim_aux << std::endl;
 	fftVol.printShape();
+	fftNoiseVol.printShape();
 	for (size_t j = 1; j< Zdim; j++)
 	{
 		myvolume.getSlice(j, slice);
@@ -489,8 +490,11 @@ void ProgMonoTomoRes::run()
 
 		fnDebug = "Signal";
 
+		std::cout << "amplitude signal " << std::endl;
 		amplitudeMonogenicSignal3D(fftVol, freq, freqH, freqL, amplitudeMS, iter, fnDebug);
+		std::cout << "amplitude Noise " << std::endl;
 		amplitudeMonogenicSignal3D(fftNoiseVol, freq, freqH, freqL, amplitudeMN, iter, fnDebug);
+		std::cout << "amplitude noise finished " << std::endl;
 
 
 		list.push_back(freq);
