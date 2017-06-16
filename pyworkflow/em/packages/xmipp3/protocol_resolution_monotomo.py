@@ -25,7 +25,7 @@
 # *
 # **************************************************************************
 from pyworkflow import VERSION_1_1
-from pyworkflow.protocol.params import (PointerParam, StringParam, BooleanParam, FloatParam, LEVEL_ADVANCED)
+from pyworkflow.protocol.params import (PointerParam, StringParam, FloatParam, LEVEL_ADVANCED)
 from pyworkflow.em.protocol.protocol_3d import ProtAnalysis3D
 from convert import readSetOfVolumes
 from pyworkflow.object import Float

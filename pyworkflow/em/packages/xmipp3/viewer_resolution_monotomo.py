@@ -28,7 +28,7 @@ from pyworkflow.gui.plotter import Plotter
 from pyworkflow.protocol.params import LabelParam, StringParam, EnumParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER
 from pyworkflow.em.viewer import ChimeraView, DataView
-from protocol_resolution_monotomo import MonoTomoRes, OUTPUT_RESOLUTION_FILE
+from protocol_resolution_monotomo import XmippProtMonoTomo, OUTPUT_RESOLUTION_FILE
 from pyworkflow.em.metadata import MetaData, MDL_X, MDL_COUNT
 from pyworkflow.em import ImageHandler
 import numpy as np
@@ -76,7 +76,7 @@ class XmippMonoTomoResViewer(ProtocolViewer):
     microscopy (cryo-EM).
     """
     _label = 'viewer MonoRes'
-    _targets = [XmippProtMonoTomoRes]      
+    _targets = [XmippProtMonoTomo]      
     _environments = [DESKTOP_TKINTER]
     
     @staticmethod
