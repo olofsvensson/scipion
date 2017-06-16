@@ -209,14 +209,14 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 //	std::cout << "xdim = " << Xdim << "  Ydim = " << Ydim << std::endl;
 	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	std::cout << "--------------" << std::endl;
-	VRiesz.printShape();
+//	VRiesz.printShape();
 	amplitudeVol.resizeNoCopy(Ndim, Zdim_aux, Ydim, Xdim);
-	std::cout << "--------------" << std::endl;
-	amplitudeVol.printShape();
-	std::cout << "--------------" << std::endl;
+//	std::cout << "--------------" << std::endl;
+//	amplitudeVol.printShape();
+//	std::cout << "--------------" << std::endl;
 	amplitude.initZeros(VRiesz);
-	amplitude.printShape();
-	std::cout << "--------------" << std::endl;
+//	amplitude.printShape();
+//	std::cout << "--------------" << std::endl;
 	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
 	std::cout << Zdim_aux << std::endl;
@@ -492,7 +492,6 @@ void ProgMonoTomoRes::run()
 
 		std::cout << "amplitude signal " << std::endl;
 		amplitudeMonogenicSignal3D(fftVol, freq, freqH, freqL, amplitudeMS, iter, fnDebug);
-		std::cout << "amplitude Noise " << std::endl;
 		amplitudeMonogenicSignal3D(fftNoiseVol, freq, freqH, freqL, amplitudeMN, iter, fnDebug);
 		std::cout << "amplitude noise finished " << std::endl;
 
@@ -502,6 +501,11 @@ void ProgMonoTomoRes::run()
 		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
 		noiseValues.clear();
 
+		std::cout << "------------------------" << std::endl;
+		amplitudeMS.printShape();
+		amplitudeMN.printShape();
+		pMask.printShape();
+		std::cout << "------------------------" << std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 		{
 			double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
