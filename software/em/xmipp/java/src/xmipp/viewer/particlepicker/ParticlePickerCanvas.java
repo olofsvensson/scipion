@@ -110,7 +110,7 @@ public abstract class ParticlePickerCanvas<P extends PickerParticle> extends Xmi
 				manageActive(active.getX() + step, active.getY());
 			}
 		}
-		if (code == KeyEvent.VK_SPACE)
+		if (code == ParticlePickerJFrame.TOGGLE_MARKER_KEY)
 		{
 			getFrame().circlechb.setSelected(tongleSetSelected);
 			getFrame().rectanglechb.setSelected(tongleSetSelected);
@@ -118,6 +118,12 @@ public abstract class ParticlePickerCanvas<P extends PickerParticle> extends Xmi
 		}else if (code == ParticlePickerJFrame.TOGGLE_ERASE_MODE_KEY){
             // Toggle erase mode.
             getFrame().activateEraseMode();
+        } else if (code == ParticlePickerJFrame.NEXT_MICROGRAPH_KEY)
+                {
+                getFrame().moveToNextMicrograph();
+        } else if (code == ParticlePickerJFrame.PREVIOUS_MICROGRAPH_KEY)
+                {
+                getFrame().moveToPreviousMicrograph();
         }else if (code == ParticlePickerJFrame.TOGGLE_LINEAR_MODE_KEY){
             // Toggle linear mode
             getFrame().activateLinearMode();
@@ -268,7 +274,7 @@ public abstract class ParticlePickerCanvas<P extends PickerParticle> extends Xmi
         }
 
         if (proceed) {
-            if (getFrame().isEraserMode())
+            if (getFrame().isEraserMode(null))
                 setCursor(eraserCursor);
 
             else if (getFrame().isLinearMode())
@@ -486,12 +492,10 @@ public abstract class ParticlePickerCanvas<P extends PickerParticle> extends Xmi
 	{
 		if (active == null)
 			return;
-		try
-		{
+		try{
 			active.setPosition(x, y);
-		}
-		catch (Exception e)
-		{
+
+		}catch (Exception e){
 			XmippDialog.showError(getFrame(), e.getMessage());
 		}
 		if (getFrame().getParticlesJDialog() != null)
@@ -518,7 +522,7 @@ public abstract class ParticlePickerCanvas<P extends PickerParticle> extends Xmi
     public void mouseMoved(MouseEvent e) {
         super.mouseMoved(e);
 
-        if (getFrame().isEraserMode()){
+        if (getFrame().isEraserMode(e)){
             paintEraser(e);
         }
     }
@@ -559,7 +563,7 @@ public abstract class ParticlePickerCanvas<P extends PickerParticle> extends Xmi
         // Resize the eraser brush
         if (!e.isShiftDown()){
             // if erase mode
-            if (getFrame().isEraserMode()){
+            if (getFrame().isEraserMode(e)){
                 getFrame().setEraserSize(getFrame().getEraserSize()+(e.getWheelRotation()*50));
                 paintEraser(e);
             }

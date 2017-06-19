@@ -24,6 +24,7 @@
 import time
 import os
 
+from pyworkflow.em.protocol.monitors.protocol_monitor_ctf import CTF_LOG_SQLITE
 from pyworkflow.tests import BaseTest, setupTestProject
 from pyworkflow.em.protocol import ProtCreateStreamData, ProtMonitorSystem
 from pyworkflow.em.packages.grigoriefflab import ProtCTFFind
@@ -58,11 +59,11 @@ class TestCtfStream(BaseTest):
                   'nDim': MICS,
                   'samplingRate': 1.25,
                   'creationInterval': 5,
-                  'delay':0,
-                  'setof': 0 # SetOfMicrographs
+                  'delay': 0,
+                  'setof': 0  # SetOfMicrographs
                 }
-        
-        #put some stress on the system
+
+        # put some stress on the system
         protStream = self.newProtocol(ProtCreateStreamData, **kwargs)
         protStream.setObjLabel('create Stream Mic')
         self.proj.launchProtocol(protStream,wait=False)
@@ -71,11 +72,12 @@ class TestCtfStream(BaseTest):
         while not protStream.hasAttribute('outputMicrographs'):
             time.sleep(10)
             protStream = self._updateProtocol(protStream)
-            if counter > 1000:
+            if counter > 10:
                 break
             counter += 1
 
-        #then introduce monitor, checking all the time ctf and sving to database
+        # then introduce monitor, checking all the time ctf and saving to
+        # database
         protCTF = ProtCTFFind(useCftfind4=True)
         protCTF.inputMicrographs.set(protStream.outputMicrographs)
         protCTF.ctfDownFactor.set(2)
@@ -84,17 +86,17 @@ class TestCtfStream(BaseTest):
         protCTF.numberOfThreads.set(4)
         self.proj.launchProtocol(protCTF, wait=False)
 
-        counter=1
-        print("while")
+        counter = 1
+
         while not protCTF.hasAttribute('outputCTF'):
-            print("whilenot")
+
             time.sleep(10)
             protCTF = self._updateProtocol(protCTF)
-            if counter > 1000:
+            if counter > 10:
                 break
             counter += 1
-        print("afterwhile")
-        kwargs = {'samplingInterval':10,
+
+        kwargs = {'samplingInterval': 10,
                   'interval': 300,
                   'maxDefocus': 40000,
                   'minDefocus': 1000,
@@ -105,5 +107,5 @@ class TestCtfStream(BaseTest):
         protMonitor.inputProtocol.set(protCTF)
         self.launchProtocol(protMonitor)
 
-        baseFn = protMonitor._getPath(protMonitor.dataBase)
+        baseFn = protMonitor._getPath(CTF_LOG_SQLITE)
         self.assertTrue(os.path.isfile(baseFn))

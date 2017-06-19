@@ -10,7 +10,7 @@
 # * (at your option) any later version.
 # *
 # * This program is distributed in the hope that it will be useful,
-# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of 
 # * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # * GNU General Public License for more details.
 # *
@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -38,6 +38,7 @@ import datetime as dt
 import pyworkflow as pw
 import pyworkflow.object as pwobj
 import pyworkflow.hosts as pwhosts
+from pyworkflow import em
 from pyworkflow.mapper import SqliteMapper
 
 PATH = os.path.dirname(__file__)
@@ -122,23 +123,32 @@ def loadHostsConf(hostsConf):
         return hosts
     except Exception as e:
         sys.exit('Failed to read settings. The reported error was:\n  %s\n'
-                 'To solve it, delete %s and run again.' % (e, hostsConf)) 
-        
+                 'To solve it, delete %s and run again.' % (e, hostsConf))
+
+
+# Helper function to recursively add items to a menu.
+def addToTree(menu, item, checkFunction=None):
+    """Add item (a dictionary that can contain more dictionaries) to menu
+    If check function is added will use it to check if the value must be added"""
+    children = item.pop('children', [])
+
+    if checkFunction is not None:
+        add = checkFunction(item)
+        if not add:
+            return
+
+    subMenu = menu.addSubMenu(**item)  # we expect item={'text': ...}
+    for child in children:
+        addToTree(subMenu, child, checkFunction)  # add recursively to sub-menu
+
+    return subMenu
+
 
 def loadProtocolsConf(protocolsConf):
     """ Read the protocol configuration from a .conf
     file similar to the one in ~/.config/scipion/protocols.conf,
     which is the default one when no file is passed.
     """
-
-    # Helper function to recursively add items to a menu.
-    def add(menu, item):
-        "Add item (a dictionary that can contain more dictionaries) to menu"
-        children = item.pop('children', [])
-        subMenu = menu.addSubMenu(**item)  # we expect item={'text': ...}
-        for child in children:
-            add(subMenu, child)  # add recursively to sub-menu
-
     # Read menus from users' config file.
     cp = ConfigParser()
     cp.optionxform = str  # keep case (stackoverflow.com/questions/1611799)
@@ -147,14 +157,33 @@ def loadProtocolsConf(protocolsConf):
     try:
         assert cp.read(protocolsConf) != [], 'Missing file %s' % protocolsConf
 
-        # Populate the protocol menu from the config file.
+        # Function to check if the protocol has to be added or not
+        # It'll receive an item as in the confg:
+        # {"tag": "protocol", "value": "ProtImportMovies", "text": "import movies"}
+        def addItem(item):
+
+            # If it is a protocol
+            if item["tag"] == "protocol":
+                # Get the class name and then if it is disabled
+                protClassName = item["value"]
+                protClass = em.getProtocols().get(protClassName)
+                if protClass is None:
+                    return False
+                else:
+                    return not protClass.isDisabled()
+            else:
+                return True
+
+        # Populate the protocols menu from the config file.
         for menuName in cp.options('PROTOCOLS'):
             menu = ProtocolConfig(menuName)
             children = json.loads(cp.get('PROTOCOLS', menuName))
             for child in children:
-                add(menu, child)
+                addToTree(menu, child, addItem)
             protocols[menuName] = menu
-        
+
+        addAllProtocols(protocols)
+
         return protocols
     
     except Exception as e:
@@ -162,7 +191,65 @@ def loadProtocolsConf(protocolsConf):
         traceback.print_exc()
         sys.exit('Failed to read settings. The reported error was:\n  %s\n'
                  'To solve it, delete %s and run again.' % (e, protocolsConf))
-        
+
+
+def isAFinalProtocol(v, k):
+    from pyworkflow.viewer import ProtocolViewer
+    if issubclass(v, ProtocolViewer):
+        return False
+    elif v.isBase() or v.isDisabled():
+        return False
+
+    # To remove duplicated protocol, ProtMovieAlignment turns into OF:
+    # ProtMovieAlignment = XmippProtOFAlignment
+    elif v.__name__ != k:
+        return False
+    else:
+        return True
+
+
+def addAllProtocols(protocols):
+    # Add all protocols
+    from pyworkflow.em import getProtocols
+    allProts = getProtocols()
+
+    # Sort the dictionary
+    allProtsSorted = OrderedDict(sorted(allProts.items(), key= lambda e: e[1].getClassLabel()))
+
+    allProtMenu = ProtocolConfig("All")
+    packages = {}
+    # Group protocols by package name
+    for k, v in allProtsSorted.iteritems():
+
+        if isAFinalProtocol(v, k):
+
+            packageName = v.getClassPackageName()
+
+            # Get the package submenu
+            packageMenu = packages.get(packageName)
+
+            # If no package menu available
+            if packageMenu is None:
+
+                # Add it to the menu ...
+                packageLine = {"tag": "package", "value": packageName, "text": packageName}
+                packageMenu = addToTree(allProtMenu, packageLine)
+
+                # Store it in the dict
+                packages[packageName] = packageMenu
+
+            # Add the protocol
+            protLine = {"tag": "protocol", "value": k, "text": v.getClassLabel(prependPackageName=False)}
+
+            # If it's a new protocol
+            if v.isNew():
+                # add the new icon
+                protLine["icon"] = "newProt.png"
+
+            addToTree(packageMenu, protLine)
+
+    protocols["All"] = allProtMenu
+
 
 def loadWebConf():
     """ Load configuration parameters to be used in web.
@@ -204,7 +291,7 @@ class ProjectSettings(pwobj.OrderedObject):
     COLOR_MODE_STATUS = 0
     COLOR_MODE_LABELS = 1
     COLOR_MODE_AGE = 2
-    COLOR_MODES = (COLOR_MODE_STATUS, COLOR_MODE_LABELS)
+    COLOR_MODES = (COLOR_MODE_STATUS, COLOR_MODE_LABELS, COLOR_MODE_AGE)
 
     def __init__(self, confs={}, **kwargs):
         pwobj.OrderedObject.__init__(self, **kwargs)

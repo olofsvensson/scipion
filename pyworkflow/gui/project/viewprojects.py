@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'xmipp@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 
@@ -96,7 +96,7 @@ class ProjectsView(tk.Frame):
         colors = ['white', '#EAEBFF']
         for i, p in enumerate(self.manager.listProjects()):
             try:
-                project = self.manager.loadProject(p.getName(), chdir=False)
+                project = self.manager.loadProject(p.getName(), chdir=False, loadAllConfig=False)
                 # Add creation time to project info
                 p.cTime = project.getCreationTime()
                 # Add if it's a link

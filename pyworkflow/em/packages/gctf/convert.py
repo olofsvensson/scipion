@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -32,6 +32,19 @@ This module contains converter functions that will serve to:
 import os
 import re
 from pyworkflow.object import Float
+import pyworkflow.utils as pwutils
+
+
+def getVersion():
+    path = os.environ['GCTF_HOME']
+    for v in getSupportedVersions():
+        if v in path or v in os.path.realpath(path):
+            return v
+    return ''
+
+
+def getSupportedVersions():
+    return ['0.50', '1.06']
 
 
 def parseGctfOutput(filename):
@@ -39,6 +52,7 @@ def parseGctfOutput(filename):
     and ctfResolution from the output file of the Gctf execution.
     """
     result = None
+    result1 = ()
     ansi_escape = re.compile(r'\x1b[^m]*m')
     if os.path.exists(filename):
         f = open(filename)
@@ -75,4 +89,15 @@ def readCtfModel(ctfModel, filename, ctf4=False):
         ctfModel.setStandardDefocus(defocusU, defocusV, defocusAngle)
     ctfModel._gctf_crossCorrelation = Float(ctfFit)
     ctfModel._gctf_ctfResolution = Float(ctfResolution)
+
+
+def getEnviron():
+    """ Return the environ settings to run gautomatch programs. """
+    environ = pwutils.Environ(os.environ)
+
+    # Take Scipion CUDA library path
+    cudaLib = environ.getFirst(('GCTF_CUDA_LIB', 'CUDA_LIB'))
+    environ.addLibrary(cudaLib)
+
+    return environ
 

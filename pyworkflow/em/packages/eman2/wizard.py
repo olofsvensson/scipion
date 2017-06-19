@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -101,6 +101,7 @@ class SparxGaussianPickerWizard(EmWizard):
         process.wait()
         myprops = readProperties(pickerProps)
 
-        for param in params:
-            form.setVar(param, myprops[param + '.value'])
+        if myprops['applyChanges'] == 'true':
+            for param in params:
+                form.setVar(param, myprops[param + '.value'])
 

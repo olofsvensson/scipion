@@ -24,24 +24,25 @@
 # *
 # *****************************************************************************
 
+import os
 import math
 
+from pyworkflow import VERSION_1_1
 from pyworkflow.protocol.params import (PointerParam, BooleanParam, StringParam,
                                         EnumParam, NumericRangeParam,
                                         PathParam, FloatParam, LEVEL_ADVANCED)
-from pyworkflow.em.protocol import ProtParticles
-from pyworkflow.em.data import Coordinate
+from pyworkflow.em.protocol import ProtParticles, ProtParticlePicking
+from pyworkflow.em.data import Coordinate, SetOfCoordinates
 
 from convert import particleToRow, rowToSubcoordinate, setEnviron
 
-
-
+from convert import getVersion, getRelionVersion
 
 CMM = 0
 HAND = 1
 
 
-class ProtLocalizedRecons(ProtParticles):
+class ProtLocalizedRecons(ProtParticlePicking, ProtParticles):
     """ This class cointains a re-implementation to a method for the
     localized three-dimensional reconstruction of such subunits. 
     After determining the particle orientations, local areas 
@@ -49,9 +50,13 @@ class ProtLocalizedRecons(ProtParticles):
     single particles.
     """
     _label = 'localized subparticles'
+    _lastUpdateVersion = VERSION_1_1
     
-    def __init__(self, **args):        
+    def __init__(self, **args):
+        ProtParticlePicking.__init__(self, **args)
         ProtParticles.__init__(self, **args)
+        self.allowMpi = False
+        self.allowThreads = False
         
     
     #--------------------------- DEFINE param functions -----------------------
@@ -88,8 +93,7 @@ class ProtLocalizedRecons(ProtParticles):
         group.addParam('defineVector',  EnumParam, default=CMM,
                       label='Is vector defined by?',
                       choices=['cmm file', 'string'],
-                      display=EnumParam.DISPLAY_HLIST,
-                      help='')
+                      display=EnumParam.DISPLAY_HLIST)
         group.addParam('vector', NumericRangeParam, default='0,0,1',
                       label='Location vectors', condition="defineVector==1",
                       help='Vector defining the location of the '
@@ -168,9 +172,9 @@ class ProtLocalizedRecons(ProtParticles):
             cmmFn = params["vectorFile"]
             vector = " "
         else:
-            cmmFn = " "
+            cmmFn = ""
             vector = params["vector"]
-            
+        
         subpartVectorList = localrec.load_vectors(cmmFn, vector,
                                                   params["length"],
                                                   params["pxSize"])
@@ -185,19 +189,9 @@ class ProtLocalizedRecons(ProtParticles):
             partItem = pyrelion.Item()
             particleToRow(part, partItem)
             
-            subparticles, _ = localrec.create_subparticles(partItem,
-                                                     symMatrices,
-                                                     subpartVectorList,
-                                                     params["dim"],
-                                                     self.relaxSym,
-                                                     self.randomize,
-                                                     "subparticles",
-                                                     params["unique"],
-                                                     0,
-                                                     self.alignSubparticles,
-                                                     "",
-                                                     True,
-                                                     filters)
+            subparticles = self.getSubparticles(localrec, partItem,
+                                                symMatrices, params,
+                                                subpartVectorList, filters)
             for subpart in subparticles:
                 rowToSubcoordinate(subpart, coord, part)
                 coord.setObjId(None) # Force to insert as a new item
@@ -206,9 +200,17 @@ class ProtLocalizedRecons(ProtParticles):
         self._defineOutputs(outputCoordinates=outputSet)
         self._defineSourceRelation(self.inputParticles, outputSet)
     
-    #--------------------------- INFO functions -------------------------------
+    #--------------------------- INFO functions --------------------------------
     def _validate(self):
         errors = []
+        relionPath = os.environ['LOCALREC_RELION_HOME']
+        if getRelionVersion() != '1.4':
+            errors.append("Relion version must be 1.4. Please add "
+                          "LOCALREC_RELION_HOME = path/to/relion-1.4 into your "
+                          "config file.")
+        if not os.path.exists(relionPath):
+            errors.append("%s does not exists. Contact with your system manager"
+                          " to install relion-1.4 or relion-1.4f" % relionPath)
         return errors
     
     def _citations(self):
@@ -221,19 +223,18 @@ class ProtLocalizedRecons(ProtParticles):
     def _methods(self):
         return []
     
-    #--------------------------- UTILS functions ------------------------------
+    #--------------------------- UTILS functions -------------------------------
     def _getInputParticles(self):
-        return self.inputParticles.get()
+        return self.getInputParticlesPointer().get()
     
     def _getSymMatrices(self):
         pass
         #matricesObjs = lr.matrix_from_symmetry(self.symmetryGroup.get())
         # We implement the binding to remove the dependency with relion. When
         # we test the new implementation (code below) and the results were
-        # different. THe nunmber of particles removed are diverge in dependency of
-        # how you obtain the symmetry matrices.
+        # different. THe nunmber of particles removed are diverge in dependency
+        # of how you obtain the symmetry matrices.
         # There aren't any obvious bug in the matrices.
-        
         
 #         matricesObjs = []
 #         matrices = md.getSymmetryMatrices(self.symmetryGroup.get())
@@ -244,3 +245,75 @@ class ProtLocalizedRecons(ProtParticles):
 #             print "Cadena Xmipp: ", a
 #             matricesObjs.append(lr.Matrix3(a))
 #        return matricesObjs
+
+    def getInputParticlesPointer(self):
+        return self.inputParticles
+
+    def registerCoords(self, coordsDir):
+        """ This methods is usually inherited from all Pickers
+        and it is used from the Java picking GUI to register
+        a new SetOfCoordinates when the user click on +Particles button.
+        """
+        suffix = self.__getOutputSuffix()
+        outputName = self.OUTPUT_PREFIX + suffix
+
+        from pyworkflow.em.packages.opic.convert import readSetOfCoordinates
+        inputset = self._getInputParticles()
+        # micrographs are the input set if protocol is not finished
+        outputset = self._createSetOfCoordinates(inputset, suffix=suffix)
+        readSetOfCoordinates(coordsDir, self._getInputParticles(), outputset)
+        summary = self.getSummary(outputset)
+        outputset.setObjComment(summary)
+        outputs = {outputName: outputset}
+        self._defineOutputs(**outputs)
+        self._defineSourceRelation(self.getInputParticlesPointer(), outputset)
+        self._store()
+
+    def __getOutputSuffix(self):
+        """ Get the name to be used for a new output.
+        For example: outputCoordiantes7.
+        It should take into account previous outputs
+        and number with a higher value.
+        """
+        maxCounter = -1
+        for attrName, _ in self.iterOutputAttributes(SetOfCoordinates):
+            suffix = attrName.replace(self.OUTPUT_PREFIX, '')
+            try:
+                counter = int(suffix)
+            except:
+                counter = 1 # when there is not number assume 1
+            maxCounter = max(counter, maxCounter)
+
+        return str(maxCounter+1) if maxCounter > 0 else '' # empty if not outputs
+    
+    def getSubparticles(self, localrec, partItem, symMatrices,
+                        params, subpartVectorList, filters):
+        if getVersion() == '1.1.0':
+            subparticles, _ = localrec.create_subparticles(partItem,
+                                                           symMatrices,
+                                                           subpartVectorList,
+                                                           params["dim"],
+                                                           self.relaxSym,
+                                                           self.randomize,
+                                                           "subparticles",
+                                                           params["unique"],
+                                                           0,
+                                                           self.alignSubparticles,
+                                                           "",
+                                                           True,
+                                                           filters)
+        else:
+            subparticles, _ = localrec.create_subparticles(partItem,
+                                                           symMatrices,
+                                                           subpartVectorList,
+                                                           params["dim"],
+                                                           self.randomize,
+                                                           "subparticles",
+                                                           params["unique"],
+                                                           0,
+                                                           self.alignSubparticles,
+                                                           "",
+                                                           False,
+                                                           filters)
+
+        return subparticles

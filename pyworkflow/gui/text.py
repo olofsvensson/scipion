@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -218,7 +218,7 @@ class Text(tk.Text, Scrollable):
         "Try to open the selected path"
         path = expandPattern(path)
 
-        # If the path is a dir, open it with   scipion browser dir <path>
+        # If the path is a dir, open it with scipion browser dir <path>
         if os.path.isdir(path):
             dpath = (path if os.path.isabs(path)
                      else os.path.join(os.getcwd(), path))
@@ -321,8 +321,13 @@ class TaggedText(Text):
         if self.colors:            
             self.colors = configureColorTags(self) # Color can be unavailable, so disable use of colors    
         
-    def openLink(self, link):
+    @staticmethod
+    def openLink(link):
         webbrowser.open_new_tab(link)  # Open in the same browser, new tab
+
+    @staticmethod
+    def mailTo(email):
+        webbrowser.open("mailto:" + email)
 
     def matchHyperText(self, match, tag):
         """ Process when a match a found and store indexes inside string."""
@@ -337,6 +342,8 @@ class TaggedText(Text):
             label = match.group('link2_label')
             if g1.startswith('http:'):
                 self.insert(tk.END, label, self.hm.add(lambda: self.openLink(g1)))
+            elif g1.startswith('mailto:'):
+                self.insert(tk.END, label, self.hm.add(lambda: self.mailTo(g1)))
             else:
                 self.insert(tk.END, label, self.hm.add(lambda: self.openPath(g1)))
         self.lastIndex = match.end()

@@ -25,7 +25,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-
+from pyworkflow import VERSION_1_1
 from pyworkflow.protocol.params import PointerParam, EnumParam, BooleanParam
 
 from pyworkflow.em.protocol import ProtOperateParticles
@@ -47,6 +47,7 @@ class XmippProtSubtractProjection(ProtOperateParticles):
         refine only the genetic material.
         """
     _label = 'subtract projection'
+    _lastUpdateVersion = VERSION_1_1
 
     CORRECT_NONE = 0
     CORRECT_FULL_CTF = 1
@@ -79,7 +80,7 @@ class XmippProtSubtractProjection(ProtOperateParticles):
         form.addParam('normalize', BooleanParam, default=False,
                    label='normalize', help = "adjust grey scale range so experimental data and synthetic data match")
 
-        form.addParallelSection(threads=3, mpi=0)
+        form.addParallelSection(threads=3, mpi=1)
 
     #--------------------------- INSERT steps functions ------------------------
     def _insertAllSteps(self):
@@ -129,7 +130,7 @@ class XmippProtSubtractProjection(ProtOperateParticles):
             self.vol.inplaceMultiply(self.mask)
         padding = 2
         maxFreq = 0.5
-        splineDegree = 2
+        splineDegree = 3
         ###
         self.fourierProjectVol = xmipp.FourierProjector(self.vol, padding, maxFreq, splineDegree)
         ###

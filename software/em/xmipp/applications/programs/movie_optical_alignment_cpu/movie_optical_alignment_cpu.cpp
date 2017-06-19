@@ -47,18 +47,23 @@ using namespace std;
 #ifdef GPU
 using namespace cv::gpu;
 #endif
+
+#define NOCOMPENSATION   0
+#define PRECOMPENSATION  1
+#define POSTCOMPENSATION 2
+
 class ProgOpticalAligment: public XmippProgram
 {
-
 public:
     FileName fnMovie, fnOut, fnGain, fnDark;
-    FileName fnMovieOut, fnMicOut;
+    FileName fnMovieOut, fnMicOut, fnMovieUncOut, fnMicUncOut;
     FileName fnMicInitial; // Filename if writing the initial average micrograph
     MetaData movie;
     int winSize, gpuDevice, nfirst, nlast, numberOfFrames;
     int finalGroupSize;
     bool globalShiftCorr, inMemory;
     double dose0, doseStep, accelerationVoltage, sampling;
+    int compensationMode;
 
     /*****************************/
     /** crop corner **/
@@ -77,6 +82,8 @@ public:
     size_t Xdim, Ydim, Zdim, Ndim;
     MultidimArray<float> tempStack;
     Image<float> tempAvg;
+	FourierTransformer transformer;
+	ProgMovieFilterDose *filterDose;
 
     void defineParams()
     {
@@ -86,18 +93,20 @@ public:
         addParamsLine("   [--oavg <fn=\"\">]              : Give the name of a micrograph to generate an aligned micrograph");
         addParamsLine("   [--oavgInitial <fn=\"\">]       : Use this option to save the initial average micrograph ");
         addParamsLine("                                   : before applying any alignment. ");
+        addParamsLine("   [--oUnc <fnMic=\"\"> <fnMovie=\"\">] : Give the name of a micrograph and movie to generate an aligned and dose uncompensated micrograph");
         addParamsLine("   [--cropULCorner <x=0> <y=0>]    : crop up left corner (unit=px, index starts at 0)");
         addParamsLine("   [--cropDRCorner <x=-1> <y=-1>]  : crop down right corner (unit=px, index starts at 0), -1 -> no crop");
         addParamsLine("   [--frameRange <n0=-1> <nF=-1>]  : First and last frame to align, frame numbers start at 0");
         addParamsLine("   [--bin <s=-1>]               : Binning factor, it may be any floating number");
         addParamsLine("   [--winSize <int=150>]        : window size for optical flow algorithm");
         addParamsLine("   [--groupSize <int=1>]        : the depth of pyramid for optical flow algorithm");
-        addParamsLine("   [--outMovie <fn=\"\">]       : save corrected stack");
+        addParamsLine("   [--outMovie <fn=\"\">]       : save corrected, dose compensated stack");
         addParamsLine("   [--dark <fn=\"\">]           : Dark correction image");
         addParamsLine("   [--gain <fn=\"\">]           : Gain correction image");
         addParamsLine("   [--inmemory]                 : Do not write a temporary file with the ");
-        addParamsLine("   [--doseCorrection <dosePerFrame=0> <Ts=1> <kV=200> <previousDose=0>] : Set dosePerFrame to 0 if you do not want to correct by the dose");
-        addParamsLine("                                : Dose in e/A^2, Sampling rate (Ts) in A");
+        addParamsLine("   [--doseCorrection <dosePerFrame=0> <Ts=1> <kV=200> <previousDose=0> <mode=\"pre\">] : Set dosePerFrame to 0 if you do not want to correct by the dose");
+        addParamsLine("                                : Dose in e/A^2, Sampling rate (Ts) in A. Valid modes are pre and post");
+        addParamsLine("                                : Pre compensates before aligning and post after aligning");
 
 #ifdef GPU
         addParamsLine("   [--gpu <int=0>]              : GPU device to be used");
@@ -113,6 +122,13 @@ public:
         fnMicOut = getParam("--oavg");
         fnMicInitial = getParam("--oavgInitial");
         fnMovieOut = getParam("--outMovie");
+        if (checkParam("--oUnc"))
+        {
+            fnMicUncOut = getParam("--oUnc",0);
+        	fnMovieUncOut = getParam("--oUnc",1);
+        	if (fnMicUncOut!="" && fnMovieUncOut=="")
+        		REPORT_ERROR(ERR_ARG_MISSING,"Writing the uncompensated images require both movie and micrograph");
+        }
         finalGroupSize = getIntParam("--groupSize");
         nfirst = getIntParam("--frameRange",0);
         nlast = getIntParam("--frameRange",1);
@@ -126,6 +142,17 @@ public:
         sampling = getDoubleParam("--doseCorrection",1);
         accelerationVoltage = getDoubleParam("--doseCorrection",2);
         dose0 = getDoubleParam("--doseCorrection",3);
+        String aux;
+        aux=getParam("--doseCorrection",4);
+        if (doseStep==0)
+        	compensationMode=NOCOMPENSATION;
+        else
+        {
+        	if (aux=="pre")
+        		compensationMode=PRECOMPENSATION;
+        	else
+        		compensationMode=POSTCOMPENSATION;
+        }
 #ifdef GPU
         gpuDevice = getIntParam("--gpu");
 #endif
@@ -200,6 +227,8 @@ public:
         Image<float> frame;
         end=std::min(end,movie.size()-1);
         end=std::min(end,(size_t)nlast);
+        if (begin>end)
+        	return 0;
 //    	std::cout << "Computing average: " << begin << " " << end << std::endl;
 
 		for (size_t i=begin;i<=end;i++)
@@ -209,7 +238,7 @@ public:
 				frame().aliasImageInStack(tempStack,actualIdx);
 			else
 			{
-//                    std::cout << "Reading " << fnTempStack << " " << actualIdx+1 << std::endl;
+//                std::cout << "Reading " << fnTempStack << " " << actualIdx+1 << std::endl;
 				frame.read(fnTempStack,DATA,actualIdx+1);
 			}
 
@@ -219,6 +248,7 @@ public:
 				tempAvg()+=frame();
 		}
         tempAvg()/=float(end-begin+1);
+//        std::cout << "Avg stats: "; tempAvg().printStats(); std::cout << std::endl;
         xmipp2Opencv(tempAvg(), cvAvgImg);
         return end-begin+1;
     }
@@ -276,6 +306,7 @@ public:
         {
             movie.read(fnMovie);
             getImageSize(movie, Xdim, Ydim, Zdim, Ndim);
+            Ndim=movie.size();
         }
         else
         {
@@ -333,6 +364,8 @@ public:
         // Initialize the stack for the output movie
         if (!fnMovieOut.isEmpty())
             createEmptyFile(fnMovieOut, Xdim, Ydim, 1, numberOfFrames, true, WRITE_REPLACE);
+        if (!fnMovieUncOut.isEmpty())
+            createEmptyFile(fnMovieUncOut, Xdim, Ydim, 1, numberOfFrames, true, WRITE_REPLACE);
 
         // Prepare stack
         if (inMemory)
@@ -348,9 +381,8 @@ public:
         Image<double> frameImage, translatedImage;
     	MultidimArray<float> Ifloat;
         Matrix1D<double> shift(2);
-    	ProgMovieFilterDose filterDose(accelerationVoltage);
-    	filterDose.pixel_size=sampling;
-    	FourierTransformer transformer;
+    	filterDose=new ProgMovieFilterDose(accelerationVoltage);
+    	filterDose->pixel_size=sampling;
     	MultidimArray< std::complex<double> > FFTI;
         FOR_ALL_OBJECTS_IN_METADATA(movie)
         {
@@ -364,27 +396,40 @@ public:
                 	frameImage()-=dark();
                 if (XSIZE(gain())>0)
                 	frameImage()*=gain();
+
                 if (movie.containsLabel(MDL_SHIFT_X))
                 {
                 	movie.getValue(MDL_SHIFT_X, XX(shift), __iter.objId);
                 	movie.getValue(MDL_SHIFT_Y, YY(shift), __iter.objId);
-                    translate(LINEAR, translatedImage(), frameImage(), shift, WRAP);
-                    frameImage()=translatedImage();
+                	if (fabs(XX(shift))>0 || fabs(YY(shift))>0)
+                	{
+//                		std::cout << "Translating " << fnFrame << " by " << shift.transpose() << std::endl;
+						translate(BSPLINE3, translatedImage(), frameImage(), shift, WRAP);
+						frameImage()=translatedImage();
+                	}
                 }
-                if (doseStep>0)
+
+                if (fnMovieUncOut!="")
+                	frameImage.write(fnMovieUncOut, currentFrameOutIdx+1, true, WRITE_REPLACE);
+
+                if (compensationMode==PRECOMPENSATION)
                 {
 					transformer.FourierTransform(frameImage(), FFTI, false);
-					filterDose.applyDoseFilterToImage(YSIZE(frameImage()), XSIZE(frameImage()), FFTI,
+					filterDose->applyDoseFilterToImage(YSIZE(frameImage()), XSIZE(frameImage()), FFTI,
 													  dose0+currentFrameInIdx*doseStep, dose0+(currentFrameInIdx+1)*doseStep);
 					transformer.inverseFourierTransform();
                 }
+//                std::cout << "Reading " << fnFrame << " "; frameImage().printStats(); std::cout << std::endl;
                 if (inMemory)
                 {
                 	typeCast(frameImage(),Ifloat);
                 	memcpy(&DIRECT_NZYX_ELEM(tempStack,currentFrameOutIdx,0,0,0),&Ifloat(0,0),MULTIDIM_SIZE(Ifloat)*sizeof(float));
                 }
                 else
+                {
                 	frameImage.write(fnTempStack, currentFrameOutIdx+1, true, WRITE_REPLACE);
+//                	std::cout << "Writing " << currentFrameOutIdx+1 << "@" << fnTempStack << std::endl;
+                }
                 currentFrameOutIdx++;
         	}
         	currentFrameInIdx++;
@@ -396,7 +441,7 @@ public:
     	produceSideInfo();
 
         Matrix1D<double> meanStdev;
-    	Image<float> undeformedGroupAverage;
+    	Image<float> undeformedGroupAverage, uncompensatedMic;
 
 #ifdef GPU
         // Matrices required in GPU part
@@ -451,6 +496,7 @@ public:
 
             cout << "Level " << levelCounter << "/" << levelNum-1
                  << " of the pyramid is under processing" << std::endl;
+            cout << "   Group size: " << currentGroupSize << ", Number of groups: " << numberOfGroups << std::endl;
 
             // Compute time for each level
             clock_t tStart = clock();
@@ -458,6 +504,8 @@ public:
             for (int currentGroup=0; currentGroup<numberOfGroups; currentGroup++)
             {
 				int NimgsInAvg=computeAvg(currentGroup*currentGroupSize+nfirst, (currentGroup+1)*currentGroupSize+nfirst-1, cvCurrentGroupAverage);
+				if (NimgsInAvg==0)
+					continue;
                 convert2Uint8(cvCurrentGroupAverage,cvCurrentGroupAverage8);
 
                 if (numberOfGroups>2)
@@ -484,7 +532,6 @@ public:
 
                 d_flowx.download(flowCurrentGroup[0]);
                 d_flowy.download(flowCurrentGroup[1]);
-                d_currentReference8.release();
                 d_currentGroupAverage8.release();
                 d_flowx.release();
                 d_flowy.release();
@@ -526,7 +573,14 @@ public:
 					FileName flowYFileName=fnmovieRoot+fnBaseOut.removeLastExtension()+formatString("flowy_%d_%d.flow",levelCounter,currentGroup);
 					saveMat(flowXFileName.c_str(), flowCurrentGroup[0]);
 					saveMat(flowYFileName.c_str(), flowCurrentGroup[1]);
-//                    std::cout << "Saving flow " << flowXFileName << std::endl;
+//					flowXFileName=fnmovieRoot+fnBaseOut.removeLastExtension()+formatString("flowx_%d_%d.mrc",levelCounter,currentGroup);
+//					flowYFileName=fnmovieRoot+fnBaseOut.removeLastExtension()+formatString("flowy_%d_%d.mrc",levelCounter,currentGroup);
+//                  std::cout << "Saving flows " << flowXFileName << " " << flowYFileName << std::endl;
+//					Image<float> save;
+//					opencv2Xmipp(flowCurrentGroup[0],save());
+//					save.write(flowXFileName);
+//					opencv2Xmipp(flowCurrentGroup[1],save());
+//					save.write(flowYFileName);
                 }
 
                 // Update cvNewReference
@@ -537,17 +591,61 @@ public:
 						flowCurrentGroup[1].at<float>(row,col) += row;
                     }
                 cv::remap(cvCurrentGroupAverage, cvUndeformedGroupAverage, flowCurrentGroup[0], flowCurrentGroup[1], cv::INTER_CUBIC);
-                if (lastLevel && !fnMovieOut.isEmpty())
+//                Image<float> save;
+//                opencv2Xmipp(cvUndeformedGroupAverage,save());
+//                std::cout << "cvUndeformedGroupAverage stats "; save().printStats(); std::cout << std::endl;
+//                opencv2Xmipp(flowCurrentGroup[0],save());
+//                std::cout << "flowCurrentGroup[0] stats "; save().printStats(); std::cout << std::endl;
+//                opencv2Xmipp(flowCurrentGroup[1],save());
+//                std::cout << "flowCurrentGroup[1] stats "; save().printStats(); std::cout << std::endl;
+                if (lastLevel)
                 {
-                	opencv2Xmipp(cvUndeformedGroupAverage,undeformedGroupAverage());
-//                	std::cout << "Writing frame " << fnMovieOut << " " << currentGroup+1 << std::endl;
-                	undeformedGroupAverage.write(fnMovieOut, currentGroup+1, true, WRITE_REPLACE);
+                    if (compensationMode==POSTCOMPENSATION)
+                    {
+                    	MultidimArray<float> If;
+                    	MultidimArray<double> Id;
+                    	MultidimArray<std::complex<double> > fId;
+						opencv2Xmipp(cvUndeformedGroupAverage,If);
+						typeCast(If,Id);
+    					transformer.FourierTransform(Id, fId, false);
+    					filterDose->applyDoseFilterToImage(YSIZE(Id), XSIZE(Id), fId,
+    													  dose0+currentGroup*doseStep, dose0+(currentGroup+1)*doseStep);
+    					transformer.inverseFourierTransform();
+    					typeCast(Id,If);
+    					xmipp2Opencv(If,cvUndeformedGroupAverage);
+                    }
+                	if (!fnMovieOut.isEmpty())
+					{
+						opencv2Xmipp(cvUndeformedGroupAverage,undeformedGroupAverage());
+	                	// std::cout << "Writing frame " << fnMovieOut << " " << currentGroup+1 << std::endl;
+						undeformedGroupAverage.write(fnMovieOut, currentGroup+1, true, WRITE_REPLACE);
+					}
+                	if (!fnMovieUncOut.isEmpty())
+                	{
+                        Image<float> frame;
+                        cv::Mat cvFrame, cvUndeformedFrame;
+                        frame.read(formatString("%d@%s",currentGroup+1,fnMovieUncOut.c_str()));
+                        xmipp2Opencv(frame(), cvFrame);
+                        cv::remap(cvFrame, cvUndeformedFrame, flowCurrentGroup[0], flowCurrentGroup[1], cv::INTER_CUBIC);
+						opencv2Xmipp(cvUndeformedFrame,frame());
+						frame.write(fnMovieUncOut, currentGroup+1, true, WRITE_REPLACE);
+
+						if (currentGroup==0)
+							uncompensatedMic()=frame();
+						else
+							uncompensatedMic()+=frame();
+                	}
                 }
                 cvNewReference+=cvUndeformedGroupAverage;
             }
-
+#ifdef GPU
+            d_currentReference8.release();
+#endif
             cvCurrentReference=cvNewReference;
             cvCurrentReference*=1.0/numberOfGroups;
+//            Image<float> save;
+//            opencv2Xmipp(cvCurrentReference,save());
+//            std::cout << "cvCurrentReference stats "; save().printStats(); std::cout << std::endl;
             printf("Processing time: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC);
             numberOfGroups=std::min(2*numberOfGroups,numberOfFrames);
             levelCounter++;
@@ -562,6 +660,12 @@ public:
         {
             opencv2Xmipp(cvCurrentReference, tempAvg());
             tempAvg.write(fnMicOut);
+        }
+
+        if (!fnMicUncOut.isEmpty())
+        {
+        	uncompensatedMic.write(fnMicUncOut);
+//        	std::cout << "Writing " << fnMicUncOut << std::endl;
         }
 
         if (!inMemory)

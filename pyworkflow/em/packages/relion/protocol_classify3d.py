@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -191,7 +191,7 @@ class ProtRelionClassify3D(ProtClassify3D, ProtRelionBase):
         if  classId in self._classesInfo:
             index, fn, row = self._classesInfo[classId]
             fn = fn + ":mrc"
-            item.setAlignment3D()
+            item.setAlignmentProj()
             item.getRepresentative().setLocation(index, fn)
             item._rlnclassDistribution = em.Float(row.getValue('rlnClassDistribution'))
             item._rlnAccuracyRotations = em.Float(row.getValue('rlnAccuracyRotations'))

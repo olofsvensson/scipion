@@ -38,6 +38,7 @@ import shlex
 import subprocess
 import uuid
 import SocketServer
+import tempfile
 
 import pyworkflow as pw
 import pyworkflow.utils as pwutils
@@ -104,6 +105,8 @@ class ProjectWindow(ProjectBaseWindow):
                             icon='fa-external-link.png')
         helpMenu.addSubMenu('About', 'about',
                             icon='fa-question-circle.png')
+        helpMenu.addSubMenu('Contact support', 'contact_us',
+                            icon='fa-question-circle.png')
 
         self.menuCfg = menu
         # TODO: up to here
@@ -113,10 +116,17 @@ class ProjectWindow(ProjectBaseWindow):
         self.showGraph = False
         Plotter.setBackend('TkAgg')
         ProjectBaseWindow.__init__(self, projTitle, master,
-                                   icon=self.icon, minsize=(900,500))
+                                   icon=self.icon, minsize=(90,50))
+        self.root.attributes("-zoomed", True)
+
+
         self.switchView(VIEW_PROTOCOLS)
 
         self.initProjectTCPServer()#Socket thread to communicate with clients
+
+        # Notify about the workflow in this project
+        from notifier import ProjectNotifier
+        ProjectNotifier(self.project).notifyWorkflow()
 
     def createHeaderFrame(self, parent):
         """Create the header and add the view selection frame at the right."""
@@ -209,7 +219,12 @@ class ProjectWindow(ProjectBaseWindow):
     def onExportTreeGraph(self):
         runsGraph = self.project.getRunsGraph(refresh=True)
         useId = not pwutils.envVarOn('SCIPION_TREE_NAME')
-        runsGraph.printDot(useId=useId)
+        dotStr = runsGraph.printDot(useId=useId)
+        with tempfile.NamedTemporaryFile(suffix='.gv') as dotFile:
+            dotFile.write(dotStr)
+            dotFile.flush()
+            openTextFileEditor(dotFile.name)
+
         if useId:
             print "\nexport SCIPION_TREE_NAME=1 # to use names instead of ids"
         else:

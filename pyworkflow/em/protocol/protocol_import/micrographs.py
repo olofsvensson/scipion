@@ -27,9 +27,9 @@
 # **************************************************************************
 
 import os
-from os.path import exists, join, basename
+from os.path import join, basename
 import re
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
@@ -145,6 +145,7 @@ class ProtImportMicBase(ProtImportImages):
         acq['voltage'] = float(acq['voltage']) / 1000.
 
         return acq
+
 
     
 class ProtImportMicrographs(ProtImportMicBase):
@@ -306,6 +307,9 @@ class ProtImportMovies(ProtImportMicBase):
 
         form.addSection('Frames')
 
+        streamingConditioned = "dataStreaming"
+        framesCondition = "inputIndividualFrames"
+
         form.addParam('inputIndividualFrames', params.BooleanParam,
                       default=False,
                       label="Input individual frames?",
@@ -313,26 +317,30 @@ class ProtImportMovies(ProtImportMicBase):
                            "frame files. ")
 
         form.addParam('numberOfIndividualFrames', params.IntParam,
-                      condition="inputIndividualFrames",
+                      condition=framesCondition,
                       label='Number of frames',
                       help='Provide how many frames are per movie. ')
 
         form.addParam('stackFrames', params.BooleanParam,
-                      default=False, condition="inputIndividualFrames",
+                      default=False, condition=framesCondition,
                       label="Create movie stacks?",
                       help="Select Yes if you want to create a new stack for "
                            "each movies with its frames. ")
 
+        # This is not working so for now its hidden
         form.addParam('writeMoviesInProject', params.BooleanParam,
-                      default=False, condition="inputIndividualFrames and stackFrames",
+                      default=False, condition=framesCondition + " and stackFrames",
                       label="Write stacks in the project folder?",
                       help="If Yes, the created stack files will be written "
                            "in the project folder. By default the movies will "
                            "be written in the same place where input frames are.")
+        # form.addParam('writeMoviesInProject', params.HiddenBooleanParam,
+        #               default=False, condition=framesCondition + " and stackFrames")
+
 
         form.addParam('movieSuffix', params.StringParam,
                       default='_frames.mrcs',
-                      condition="inputIndividualFrames and stackFrames",
+                      condition=framesCondition + " and stackFrames",
                       label="Movie suffix",
                       help="Suffix added to the output movie filename."
                            "Use the extension to select the format ("
@@ -340,7 +348,7 @@ class ProtImportMovies(ProtImportMicBase):
 
         form.addParam('deleteFrames', params.BooleanParam,
                       default=False,
-                      condition="inputIndividualFrames and stackFrames",
+                      condition=framesCondition + " and stackFrames",
                       label="Delete frame files?",
                       help="Select Yes if you want to remove the individual "
                            "frame files after creating the movie stack. ")
@@ -449,15 +457,25 @@ class ProtImportMovies(ProtImportMicBase):
                     if movieOut.endswith("mrc"):
                         movieOut += ":mrcs"
 
-                    self.info("Writing movie stack: %s" % movieFn)
-                    pwutils.cleanPath(movieFn)  # Remove the output file if exists
+                    # By default we will write the movie stacks
+                    # unless we are in continue mode and the file exists
+                    writeMovie = True
+                    if (self.isContinued() and os.path.exists(movieFn)):
+                        self.info("Skipping movie stack: %s, seems to be done"
+                                  % movieFn)
+                        writeMovie = False
 
-                    for i, frame in enumerate(sorted(v, key=lambda x: x[0])):
-                        frameFn = frame[1] # Frame name stored previously
-                        ih.convert(frameFn, (i+1, movieOut))
+                    if writeMovie:
+                        self.info("Writing movie stack: %s" % movieFn)
+                        # Remove the output file if exists
+                        pwutils.cleanPath(movieFn)
 
-                        if self.deleteFrames:
-                            pwutils.cleanPath(frameFn)
+                        for i, frame in enumerate(sorted(v, key=lambda x: x[0])):
+                            frameFn = frame[1] # Frame name stored previously
+                            ih.convert(frameFn, (i+1, movieOut))
+
+                            if self.deleteFrames:
+                                pwutils.cleanPath(frameFn)
 
                     # Now return the newly created movie file as imported file
                     self.createdStacks.add(movieFn)

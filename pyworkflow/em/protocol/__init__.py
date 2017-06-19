@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -49,4 +49,5 @@ from protocol_create_stream_data import ProtCreateStreamData
 from parallel import ProtTestParallel
 
 from monitors import *
-
+#from protocol_export import *
+from protocol_export.protocol_export_emdb import ProtExportEMDB

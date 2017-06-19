@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -44,17 +44,31 @@ class SolidAnglesViewer(Viewer):
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
     _targets = [XmippProtSolidAngles]
     
-
-    def _visualize(self, obj, **args):
+    def _visualize(self, obj, **kwargs):
         views = []
-        labels = 'id enabled _representative._filename _reprojection._filename _xmipp_angleRot _xmipp_angleTilt'
-        renderLabels = '_representative._filename _reprojection._filename'
-        if getattr(obj,'outputClasses'):
-            views.append(ObjectView(self._project, obj.strId(), obj.outputClasses.getFileName(),
+        outputClasses = getattr(obj, 'outputClasses', None)
+
+        if outputClasses is not None:
+            renderLabels = '_representative._filename _reprojection._filename'
+            labels = 'id enabled %s _representative._xmipp_angleRot _representative._xmipp_angleTilt _representative._xmipp_classCount' % renderLabels
+    
+            views.append(ObjectView(self._project, outputClasses.strId(),
+                                    outputClasses.getFileName(),
                                     viewParams={showj.ORDER: labels, 
                                                 showj.VISIBLE: labels,
                                                 showj.RENDER: renderLabels,
                                                 showj.MODE: showj.MODE_MD}))
+
+            outputAverages = getattr(obj, 'outputAverages', None)
+            if outputAverages is not None:
+                renderLabels = '_filename'
+                labels = 'id enabled %s _xmipp_angleRot _xmipp_angleTilt _xmipp_classCount' % renderLabels
+                views.append(ObjectView(self._project, outputAverages.strId(),
+                                        outputAverages.getFileName(),
+                                        viewParams={showj.ORDER: labels, 
+                                                    showj.VISIBLE: labels,
+                                                    showj.RENDER: renderLabels,
+                                                    showj.MODE: showj.MODE_MD}))            
         else:
             views.append(self.infoMessage("No output has been generate yet"))
         

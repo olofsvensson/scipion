@@ -27,18 +27,19 @@
 import os
 from itertools import izip
 
-from pyworkflow.protocol.params import PointerParam, FileParam, StringParam
+from pyworkflow.protocol.params import PointerParam, \
+    FileParam, StringParam, IntParam
 from pyworkflow.em.protocol import EMProtocol
 from pyworkflow.em.data import (SetOfImages, SetOfCTF, SetOfClasses,
                                 SetOfClasses3D, SetOfVolumes, EMObject, EMSet,
                                 SetOfNormalModes, SetOfParticles, FSC,
-                                Class2D, Class3D, SetOfMicrographs)
+                                Class2D, Class3D, SetOfMicrographs, ALIGN_NONE)
 from pyworkflow.em.data_tiltpairs import (TiltPair, MicrographsTiltPair,
                                           ParticlesTiltPair)
 from pyworkflow.em.data import Mask
 from pyworkflow.utils import moveFile
 
-
+from cPickle import dumps, loads
 
 class BatchProtocol(EMProtocol):
     """ Base class to all protocols that are launched
@@ -55,10 +56,9 @@ class ProtUserSubSet(BatchProtocol):
     from the ShowJ gui. The enabled/disabled changes will be stored in a temporary sqlite
     file that will be read to create the new subset.
     """
-     
     def __init__(self, **args):
         BatchProtocol.__init__(self, **args)
-        
+
     def _defineParams(self, form):
         form.addHidden('inputObject', PointerParam, pointerClass='Object')
         form.addHidden('other', StringParam, allowsNull=True)
@@ -110,15 +110,15 @@ class ProtUserSubSet(BatchProtocol):
                 self._createSubSetFromClasses(setObj)
 
             elif isinstance(setObj, SetOfImages):
-                setObj.copyInfo(otherObj) # copy info from original images
+                setObj.copyInfo(otherObj)  # copy info from original images
                 self._createSubSetFromImages(setObj)
 
             elif isinstance(setObj, SetOfNormalModes):
                 self._createSimpleSubset(otherObj)
-            
+
         else:
             output = self._createSimpleSubset(inputObj)
-    
+
     def _createSimpleSubset(self, inputObj):
         className = inputObj.getClassName()
         createFunc = getattr(self, '_create' + className)
@@ -176,7 +176,7 @@ class ProtUserSubSet(BatchProtocol):
 
     def _createSubSetFromClasses(self, inputClasses):
         outputClassName = self.outputClassName.get()
-        
+
         if (outputClassName.startswith('SetOfAverages') or
             outputClassName.startswith('SetOfVolumes') or
             outputClassName.startswith('SetOfParticles')):
@@ -244,11 +244,15 @@ class ProtUserSubSet(BatchProtocol):
         inputImages = inputClasses.getImages()
         createFunc = getattr(self, '_create' + outputClassName)
         modifiedSet = inputClasses.getClass()(filename=self._dbName, prefix=self._dbPrefix)
-        self.info("Creating REPRESENTATIVES of images from classes,  sqlite file: %s" % self._dbName)
+        self.info("Creating REPRESENTATIVES of images from classes, sqlite file: %s" % self._dbName)
 
         count = 0
         output = createFunc()
         output.copyInfo(inputImages)
+        # For now this is to avoid having a wrong alignment.
+        # THis is because is getting the alignment info from the input images and this does not have to match.
+        # This created a error when scaling averages #903
+        output.setAlignment(ALIGN_NONE)
         for cls in modifiedSet:
             if cls.isEnabled():
                 img = cls.getRepresentative()
@@ -261,12 +265,12 @@ class ProtUserSubSet(BatchProtocol):
             self._defineSourceRelation(inputClasses, output)
         else:
             self._defineSourceRelation(inputImages, output)
-        
+
         selectmsg = 'we selected %s items' % count if count > 1 else 'was selected 1 item'
-        msg = 'From input %s of size %s %s to create output %s'%(inputClasses.getClassName(), 
-                                                                 inputClasses.getSize(), 
-                                                                 selectmsg, 
-                                                                 output.getClassName())
+        msg = 'From input %s of size %s %s to create output %s' % (inputClasses.getClassName(),
+                                                                   inputClasses.getSize(),
+                                                                   selectmsg,
+                                                                   output.getClassName())
         self.summaryVar.set(msg)
         return output
 
@@ -291,8 +295,8 @@ class ProtUserSubSet(BatchProtocol):
         className = inputImages.getClassName()
         createFunc = getattr(self, '_create' + className)
         modifiedSet = inputClasses.getClass()(filename=self._dbName, prefix=self._dbPrefix)
-        self.info("Creating subset of images from classes,  sqlite file: %s" % self._dbName)
-        
+        self.info("Creating subset of images from classes, sqlite file: %s" % self._dbName)
+
         output = createFunc()
         self._copyInfoAndSetAlignment(inputClasses, output)
         output.appendFromClasses(modifiedSet)
@@ -303,14 +307,14 @@ class ProtUserSubSet(BatchProtocol):
         self._defineTransformRelation(inputImages, output)
         count = len([cls for cls in modifiedSet if cls.isEnabled()])
         selectmsg = 'we selected %s items' % count if count > 1 else 'was selected 1 item'
-        msg = 'From input %s of size %s %s to create output %s of size %s'%(inputClasses.getClassName(), 
-                                                                            inputClasses.getSize(),  
-                                                                            selectmsg, 
-                                                                            output.getClassName(), 
-                                                                            output.getSize())
+        msg = 'From input %s of size %s %s to create output %s of size %s' % (inputClasses.getClassName(),
+                                                                              inputClasses.getSize(),
+                                                                              selectmsg,
+                                                                              output.getClassName(),
+                                                                              output.getSize())
         self.summaryVar.set(msg)
         return output
- 
+
     def _createClassesFromClasses(self, inputClasses):
         """ Create a new set of images joining all images
         assigned to each class.
@@ -319,8 +323,8 @@ class ProtUserSubSet(BatchProtocol):
         className = inputClasses.getClassName()
         createFunc = getattr(self, '_create' + className)
         modifiedSet = inputClasses.getClass()(filename=self._dbName, prefix=self._dbPrefix)
-        self.info("Creating subset of classes from classes,  sqlite file: %s" % self._dbName)
-        
+        self.info("Creating subset of classes from classes, sqlite file: %s" % self._dbName)
+
         output = createFunc(inputClasses.getImages())
         output.appendFromClasses(modifiedSet)
         # Register outputs
@@ -331,10 +335,13 @@ class ProtUserSubSet(BatchProtocol):
             self._defineSourceRelation(inputClasses.getImages(), output)
         count = len([cls for cls in modifiedSet if cls.isEnabled()])
         selectmsg = 'we selected %s items' % count if count > 1 else 'was selected 1 item'
-        msg = 'From input %s of size %s %s to create output %s'%(inputClasses.getClassName(), inputClasses.getSize(),  selectmsg, output.getClassName())
+        msg = 'From input %s of size %s %s to create output %s' % (inputClasses.getClassName(),
+                                                                   inputClasses.getSize(),
+                                                                   selectmsg,
+                                                                   output.getClassName())
         self.summaryVar.set(msg)
         return output
-        
+
     def _createSubSetFromMicrographsTiltPair(self, micrographsTiltPair):
         """ Create a subset of Micrographs Tilt Pair. """
         output = MicrographsTiltPair(filename=self._getPath('micrographs_pairs.sqlite'))
@@ -363,7 +370,7 @@ class ProtUserSubSet(BatchProtocol):
     def _createSubSetFromParticlesTiltPair(self, particlesTiltPair):
         """ Create a subset of Particles Tilt Pair. """
         output = ParticlesTiltPair(filename=self._getPath('particles_pairs.sqlite'))
-        
+
         inputU = particlesTiltPair.getUntilted()
         inputT = particlesTiltPair.getTilted()
         outputU = SetOfParticles(filename=self._getPath('particles_untilted.sqlite'))
@@ -382,6 +389,8 @@ class ProtUserSubSet(BatchProtocol):
         # Register outputs
         output.setUntilted(outputU)
         output.setTilted(outputT)
+        # Link output to the same coordinates pairs than input
+        output.setCoordsPair(particlesTiltPair.getCoordsPair())
 
         outputDict = {'outputParticlesTiltPair': output}
         self._defineOutputs(**outputDict)
@@ -434,8 +443,8 @@ class ProtUserSubSet(BatchProtocol):
 
     def _defineOutput(self, className, output):
         outputDict = {'output' + className.replace('SetOf', ''): output}
-        self._defineOutputs(**outputDict) 
-        
+        self._defineOutputs(**outputDict)
+
 
 class ProtCreateMask(BatchProtocol):
 
@@ -453,15 +462,15 @@ class ProtCreateMask(BatchProtocol):
         maskDst = self._getPath(basename)
         moveFile(maskSrc, maskDst)
         samplingRate = None
-        if(hasattr(inputObj, "getSamplingRate")):
+        if hasattr(inputObj, "getSamplingRate"):
             samplingRate = inputObj.getSamplingRate()
         else:
             for key, attr in inputObj.iterInputAttributes():
                 if hasattr(attr.get(), "getSamplingRate"):
                     samplingRate = attr.get().getSamplingRate()
-        if  not samplingRate:
+        if not samplingRate:
             raise Exception("sampling rate required")
-        
+
         mask = Mask()
         mask.setFileName(maskDst)
         mask.setSamplingRate(samplingRate)
@@ -474,7 +483,7 @@ class ProtCreateMask(BatchProtocol):
                        % (self.getObjectTag("inputObj"),
                           self.getObjectTag("outputMask")))
         return summary
-        
+
     def _methods(self):
         return self._summary()
 
@@ -483,11 +492,46 @@ class ProtCreateMask(BatchProtocol):
 class ProtCreateFSC(BatchProtocol):
 
     def _defineParams(self, form):
-        pass
-        form.addHidden('inputObj', PointerParam, pointerClass='EMObject')
+        form.addHidden('inputObj', PointerParam,
+                       pointerClass='EMObject')
+        form.addHidden('fscValues', StringParam,
+                       help='String represention of the list with FSC values')
+        form.addHidden('fscLabels', StringParam,
+                       help='String with fsc labels')
 
     def setInputObj(self, obj):
         self.inputObj.set(obj)
+
+    def setInputFscList(self, fscList):
+        fscStr = ''
+        fscLabel = ""
+        numberFsc = 0
+        for fsc in fscList:
+            if numberFsc == 0:
+                numberFsc += 1
+            else:
+                fscStr += "|"
+                fscLabel += "|"
+            fscStr += dumps(fsc.getData())
+            fscLabel += dumps(fsc.getObjLabel())
+        self.fscValues.set(fscStr)
+        self.fscLabels.set(fscLabel)
+
+    def _insertAllSteps(self):
+        self._insertFunctionStep('createOutputStep')
+
+    def createOutputStep(self):
+        from pyworkflow import em
+        fscSet = self._createSetOfFSCs()
+        fscSet.setObjLabel("setOfFSCs")
+        dataStringList = self.fscValues.get().split("|")
+        labelStringList = self.fscLabels.get().split("|")
+        for fsc, label in zip(dataStringList, labelStringList):
+            _fsc = em.data.FSC(objLabel=loads(label))
+            freq, value = loads(fsc)
+            _fsc.setData(freq,value)
+            fscSet.append(_fsc)
+        self._defineOutputs(outputFSCs=fscSet)
 
     def _summary(self):
         summary = []
@@ -498,6 +542,4 @@ class ProtCreateFSC(BatchProtocol):
 
     def _methods(self):
         return self._summary()
-
-
 

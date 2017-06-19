@@ -21,7 +21,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 """
@@ -450,7 +450,7 @@ def rowToCoordinate(coordRow):
             
         # Setup the micId if is integer value
         try:
-            coord.setMicId(int(coordRow.getValue(xmipp.MDL_MICROGRAPH)))
+            coord.setMicId(int(coordRow.getValue(xmipp.MDL_MICROGRAPH_ID)))
         except Exception:
             pass
     else:
@@ -638,7 +638,7 @@ loop_
     f.write(s)
     return f
 
-def writeSetOfCoordinates(posDir, coordSet, ismanual=True):
+def writeSetOfCoordinates(posDir, coordSet, ismanual=True, scale=1):
     """ Write a pos file on metadata format for each micrograph 
     on the coordSet. 
     Params:
@@ -671,38 +671,32 @@ def writeSetOfCoordinates(posDir, coordSet, ismanual=True):
             # we need to close previous opened file
             if f:
                 f.close()
-                #print "Micrograph %s (%d)" % (lastMicId, c)
                 c = 0
             f = openMd(posDict[micId], ismanual=ismanual)
             lastMicId = micId
         c += 1
+        if scale != 1:
+            x = coord.getX() * scale
+            y = coord.getY() * scale
+        else:
+            x = coord.getX()
+            y = coord.getY()
         f.write(" %06d   1   %d  %d  %d   %06d\n"
-                % (coord.getObjId(), coord.getX(), coord.getY(), 1, micId))
+                % (coord.getObjId(), x, y, 1, micId))
     
     if f:
         f.close()
-        print "Micrograph %s (%d)" % (lastMicId, c)
-    
+
     state = 'Manual' if ismanual else 'Supervised'
     # Write config.xmd metadata
     configFn = join(posDir, 'config.xmd')
     md = xmipp.MetaData()
     # Write properties block
     objId = md.addObject()
-#     micName = removeBaseExt(micName)
-#     md.setValue(xmipp.MDL_MICROGRAPH, str(micName), objId)
-    #md.setValue(xmipp.MDL_COLOR, int(-16776961), objId)
     md.setValue(xmipp.MDL_PICKING_PARTICLE_SIZE, int(boxSize), objId)
     md.setValue(xmipp.MDL_PICKING_STATE, state, objId)
     md.write('properties@%s' % configFn)
 
-#     # Write filters block
-#     md = xmipp.MetaData()    
-#     objId = md.addObject()
-#     md.setValue(xmipp.MDL_MACRO_CMD, 'Gaussian_Blur...', objId)
-#     md.setValue(xmipp.MDL_MACRO_CMD_ARGS, 'sigma=2', objId)
-#     md.write('filters@%s' % configFn, xmipp.MD_APPEND)
-    
     return posDict.values()
 
 
@@ -728,24 +722,26 @@ def readSetOfCoordinates(outputDir, micSet, coordSet):
 
     coordSet._xmippMd = String(outputDir)
 
-
-
 def readCoordinates(mic, fileName, coordsSet, outputDir):
         posMd = readPosCoordinates(fileName)
-        posMd.addLabel(xmipp.MDL_ITEM_ID)#TODO: CHECK IF THIS LABEL IS STILL NECESSARY
+        # TODO: CHECK IF THIS LABEL IS STILL NECESSARY
+        posMd.addLabel(md.MDL_ITEM_ID)
 
         for objId in posMd:
+            # When do an union of two metadatas of coordinates and one of
+            # them doesn't has MDL_ENABLED, the default vaule to is 0,
+            # and its not allowed value. Maybe we need to solve this in xmipp
+            # code.
+            if posMd.getValue(md.MDL_ENABLED, objId) == 0:
+                posMd.setValue(md.MDL_ENABLED, 1, objId)
+            
             coord = rowToCoordinate(rowFromMd(posMd, objId))
             coord.setMicrograph(mic)
             coord.setX(coord.getX())
             coord.setY(coord.getY())
             coordsSet.append(coord)
-            # Add an unique ID that will be propagated to particles
-            posMd.setValue(xmipp.MDL_ITEM_ID, long(coord.getObjId()), objId)
-        #if not posMd.isEmpty():
-         #   scipionPosFile = join(outputDir, "scipion_" + replaceBaseExt(mic.getFileName(), 'pos'))
-          #  posMd.write("particles@%s"  % scipionPosFile)
-    
+            posMd.setValue(md.MDL_ITEM_ID, long(coord.getObjId()), objId)
+
 
 def readPosCoordinates(posFile):
     """ Read the coordinates in .pos file and return corresponding metadata.
@@ -754,18 +750,17 @@ def readPosCoordinates(posFile):
     particles_auto: with automatically picked particles.
     If posFile doesn't exist, the metadata will be empty 
     """
-    md = xmipp.MetaData()
+    mData = md.MetaData()
     
     if exists(posFile):
-        blocks = xmipp.getBlocksInMetaDataFile(posFile)
+        blocks = md.getBlocksInMetaDataFile(posFile)
         
         for b in ['particles', 'particles_auto']:
             if b in blocks:
-                mdAux = xmipp.MetaData('%(b)s@%(posFile)s' % locals())
-                md.unionAll(mdAux)
-        md.removeDisabled()
-    
-    return md
+                mdAux = md.MetaData('%(b)s@%(posFile)s' % locals())
+                mData.unionAll(mdAux)
+        mData.removeDisabled()
+    return mData
 
 
 def readSetOfImages(filename, imgSet, rowToFunc, **kwargs):
@@ -1228,8 +1223,9 @@ def rowToAlignment(alignmentRow, alignType):
             shifts[2] = alignmentRow.getValue(xmipp.MDL_SHIFT_Z, 0.)
             angles[2] = alignmentRow.getValue(xmipp.MDL_ANGLE_PSI, 0.)
             if flip:
-                angles[0] = - angles[0] # rot = -rot
-                angles[1] = 180 + angles[1] # tilt = tilt + 180
+                angles[1] =  angles[1]+180 # tilt + 180
+                angles[2] = 180 - angles[2] # 180 - psi
+                shifts[0] = -shifts[0] # -x
         else:
             psi = alignmentRow.getValue(xmipp.MDL_ANGLE_PSI, 0.)
             rot = alignmentRow.getValue(xmipp.MDL_ANGLE_ROT, 0.)
@@ -1237,7 +1233,7 @@ def rowToAlignment(alignmentRow, alignType):
                 print "HORROR rot and psi are different from zero in 2D case"
             angles[0] = alignmentRow.getValue(xmipp.MDL_ANGLE_PSI, 0.) + \
                         alignmentRow.getValue(xmipp.MDL_ANGLE_ROT, 0.)
-        #if alignment
+        
         matrix = matrixFromGeometry(shifts, angles, inverseTransform)
 
         if flip:
@@ -1249,8 +1245,7 @@ def rowToAlignment(alignmentRow, alignType):
                 matrix[3,3] *= -1.
             elif alignType==ALIGN_PROJ:
                 pass
-                #matrix[0,:4] *= -1.#now, invert first line including x
-##
+        
         alignment.setMatrix(matrix)
         
         #FIXME: now are also storing the alignment parameters since
@@ -1299,10 +1294,11 @@ def alignmentToRow(alignment, alignmentRow, alignType):
             pass
 
     else:
-        pass
-        #flip = bool(numpy.linalg.det(matrix[0:3,0:3]) < 0)
-        #if flip:
-        #    matrix[0,:4] *= -1.#now, invert first line including x
+        flip = bool(numpy.linalg.det(matrix[0:3,0:3]) < 0)
+        if flip:
+            raise Exception("the det of the transformation matrix is "
+                            "negative. This is not a valid transformation "
+                            "matrix for Scipion.")
     shifts, angles = geometryFromMatrix(matrix, inverseTransform)
     alignmentRow.setValue(xmipp.MDL_SHIFT_X, shifts[0])
     alignmentRow.setValue(xmipp.MDL_SHIFT_Y, shifts[1])
