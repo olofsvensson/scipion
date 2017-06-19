@@ -91,7 +91,7 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
                                      anglesFn, self.inputVolume.get().getDim()[0])
         else:
             anglesFn=self.imgsFn
-        self._insertFunctionStep("produceResiduals", vol.getFileName(), anglesFn)
+        self._insertFunctionStep("produceResiduals", vol.getFileName(), anglesFn, vol.getSamplingRate())
         self._insertFunctionStep("evaluateResiduals")
         self._insertFunctionStep("createOutputStep")
 

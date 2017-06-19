@@ -177,7 +177,7 @@ Examples:
                     fnDir = join(fnDir,'globalAssignment')
                 else:
                     fnDir = join(fnDir,'localAssignment')
-                fnVolumes = [join(fnDir,"volumeRef01.vol"),join(fnDir,"volumeRef02.vol")]
+                fnVolume = join(fnDir,"volumeRef01.vol")
             elif choice == 1:
                 fnVolume = join(fnDir,"volumeAvg.mrc")
             elif choice == 2:

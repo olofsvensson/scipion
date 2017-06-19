@@ -44,9 +44,7 @@ void ProgReconstructSignificant::defineParams()
     addParamsLine("  [--numberOfVolumes <N=1>]    : Number of volumes to reconstruct");
     addParamsLine("  [--initvolumes <md_file=\"\">] : Set of initial volumes. If none is given, a single volume");
     addParamsLine("                               : is reconstructed with random angles assigned to the images");
-    addParamsLine("  [--initgallery <md_file=\"\">]   : Gallery of projections");
-    addParamsLine("                               :+ If several volumes are used, then the projections of each volume");
-    addParamsLine("                               :+ should be a separate block");
+    addParamsLine("  [--initgallery <md_file=\"\">]   : Gallery of projections from a single volume");
     addParamsLine("  [--odir <outputDir=\".\">]   : Output directory");
     addParamsLine("  [--sym <symfile=c1>]         : Enforce symmetry in projections");
     addParamsLine("  [--iter <N=10>]              : Number of iterations");
@@ -64,6 +62,7 @@ void ProgReconstructSignificant::defineParams()
     addParamsLine("  [--dontReconstruct]          : Do not reconstruct");
     addParamsLine("  [--useForValidation <numOrientationsPerParticle=10>] : Use the program for validation. This number defines the number of possible orientations per particle");
     addParamsLine("  [--dontCheckMirrors]         : Don't check mirrors in the alignment process");
+
 }
 
 // Read arguments ==========================================================
@@ -200,8 +199,7 @@ void ProgReconstructSignificant::alignImagesToGallery()
 	    	for (size_t nVolume=0; nVolume<Nvols; ++nVolume)
 	    	{
 	    		AlignmentTransforms *transforms=galleryTransforms[nVolume];
-	    		size_t NdirsThisVolume=mdGallery[nVolume].size();
-		    	for (size_t nDir=0; nDir<NdirsThisVolume; ++nDir)
+		    	for (size_t nDir=0; nDir<Ndirs; ++nDir)
 				{
 					mCurrentImageAligned=mCurrentImage;
 					mGalleryProjection.aliasImageInStack(gallery[nVolume](),nDir);
@@ -414,8 +412,6 @@ void ProgReconstructSignificant::run()
 
     	size_t Nvols=mdGallery.size();
     	size_t Ndirs=mdGallery[0].size();
-    	for (size_t nVolume=1; nVolume<Nvols; ++nVolume)
-    		Ndirs=std::max(Ndirs,mdGallery[nVolume].size());
     	cc.initZeros(Nimgs,Nvols,Ndirs);
     	weight=cc;
     	double oneAlpha=1-currentAlpha-deltaAlpha2;
@@ -432,7 +428,6 @@ void ProgReconstructSignificant::run()
     		init_progress_bar(Nvols);
 			for (size_t nVolume=0; nVolume<Nvols; ++nVolume)
 			{
-				Ndirs=mdGallery[nVolume].size();
 				for (size_t nDir=0; nDir<Ndirs; ++nDir)
 				{
 					// Look for the best correlation for this direction
@@ -623,7 +618,6 @@ void ProgReconstructSignificant::reconstructCurrent()
 void ProgReconstructSignificant::generateProjections()
 {
 	FileName fnGallery, fnGalleryMetaData;
-	StringVector blocks;
 	if (iter>1 || fnFirstGallery=="")
 	{
 		FileName fnVol, fnAngles;
@@ -645,8 +639,6 @@ void ProgReconstructSignificant::generateProjections()
 		}
 		synchronize();
 	}
-	else if (iter==1 && fnFirstGallery!="")
-		getBlocksInMetaDataFile(fnFirstGallery,blocks);
 
 	// Read projection galleries
 	std::vector<GalleryImage> galleryNames;
@@ -665,10 +657,8 @@ void ProgReconstructSignificant::generateProjections()
 		}
 		else
 		{
-			fnGalleryMetaData=blocks[n]+"@"+fnFirstGallery;
-			MDRow row=firstRow(fnGalleryMetaData);
-			row.getValue(MDL_IMAGE,fnGallery);
-			fnGallery=fnGallery.getDecomposedFileName();
+			fnGalleryMetaData=fnFirstGallery;
+			fnGallery=fnFirstGallery.replaceExtension("stk");
 		}
 		MetaData mdAux(fnGalleryMetaData);
 		galleryNames.clear();
@@ -725,7 +715,7 @@ void ProgReconstructSignificant::numberOfProjections()
 	angularSampling = angDist[minIndex];
 */
 
-	alpha0 = numOrientationsPerParticle/(number_of_projections*mdGallery.size());
+	alpha0 = numOrientationsPerParticle/number_of_projections;
 	alphaF = alpha0;
 	deltaAlpha2 = 1/(2*number_of_projections);
 
@@ -845,11 +835,7 @@ void ProgReconstructSignificant::produceSideinfo()
 			deleteFile(fnInit);
 	}
 	else
-	{
-		StringVector blocks;
-		getBlocksInMetaDataFile(fnFirstGallery,blocks);
-		Nvolumes=blocks.size();
-	}
+		Nvolumes=1;
 	synchronize();
 
 	// Copy all input values as iteration 0 volumes
