@@ -81,12 +81,15 @@ void ProgMonoTomoRes::produceSideInfo()
 
 	if (fnTomo == ""){
 		V()=0.5*(V1()+V2());
+
 		V.write("meanVolume.vol");
 	}
 	else{
 	    V.read(fnTomo);
 	}
 	//V().setXmippOrigin();
+
+
 
 	//Defining the volume
 	MultidimArray<double> &inputVol = V();
@@ -97,6 +100,8 @@ void ProgMonoTomoRes::produceSideInfo()
 	//Defining the noise
 	V1()-=V2();
 	noiseVolume = V1()/2;
+	noiseVolume.write("noise_volume.vol");
+
 	V1.clear();
 	V2.clear();
 
@@ -204,18 +209,9 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	MultidimArray< std::complex<double> > fftSlice;
 	size_t Xdim, Ydim, Zdim, Ndim, Zdim_aux;
 	myfftV.getDimensions(Xdim, Ydim, Zdim_aux, Ndim);
-//	std::cout << "xdim = " << Xdim << "  Ydim = " << Ydim << std::endl;
 	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
-	std::cout << "--------------" << std::endl;
-//	VRiesz.printShape();
 	amplitudeVol.resizeNoCopy(Ndim, Zdim_aux, Ydim, Xdim);
-//	std::cout << "--------------" << std::endl;
-//	amplitudeVol.printShape();
-//	std::cout << "--------------" << std::endl;
 	amplitude.initZeros(VRiesz);
-//	amplitude.printShape();
-//	std::cout << "--------------" << std::endl;
-	//fftSlice.initZeros(Xdim, Ydim);
 	//////////////////////////////
 	std::cout << Zdim_aux << std::endl;
 	for (size_t ss = 0; ss < Zdim_aux; ss++)
@@ -499,11 +495,6 @@ void ProgMonoTomoRes::run()
 		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
 		noiseValues.clear();
 
-		std::cout << "------------------------" << std::endl;
-		amplitudeMS.printShape();
-		amplitudeMN.printShape();
-		pMask.printShape();
-		std::cout << "------------------------" << std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 		{
 			double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
