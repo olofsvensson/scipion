@@ -100,7 +100,8 @@ void ProgMonoTomoRes::produceSideInfo()
 	//Defining the noise
 	V1()-=V2();
 	noiseVolume = V1()/2;
-	noiseVolume.write("noise_volume.vol");
+	Image<double> savenoise = noiseVolume;
+	savenoise.write("noise_volume.vol");
 
 	V1.clear();
 	V2.clear();
