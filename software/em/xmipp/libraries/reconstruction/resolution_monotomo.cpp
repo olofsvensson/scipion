@@ -144,15 +144,6 @@ void ProgMonoTomoRes::produceSideInfo()
 		}
 	}
 
-
-
-	mask().initZeros(inputVol);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pMask)
-	{
-		NVoxelsOriginalMask++;
-		DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-	}
-
 	V.write("smoothed_volume.vol");
 
 
