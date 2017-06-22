@@ -271,7 +271,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 	for (size_t ss = 0; ss < Zdim_aux; ss++)
 	{
-		//std::cout << ss << std::endl;
+		std::cout << ss << std::endl;
 		myfftV.getSlice(ss, fftSlice);
 		long n=0;
 		fftVRiesz.initZeros(fftSlice);
@@ -494,6 +494,7 @@ void ProgMonoTomoRes::run()
 		amplitudeMonogenicSignal3D(fftVol, freq, freqH, freqL, amplitudeMS, iter, fnDebug);
 		amplitudeMonogenicSignal3D(fftNoiseVol, freq, freqH, freqL, amplitudeMN, iter, fnDebug);
 
+		std::cout << "Iteration " << std::endl;
 
 		list.push_back(freq);
 
