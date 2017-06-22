@@ -260,7 +260,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	amplitude.initZeros(VRiesz);
 	#ifdef DEBUG
 	MultidimArray<double> amplitudeVol_aux;
-	amplitudeVol_aux.initZeros(VRiesz);
+	amplitudeVol_aux.initZeros(pMask);
 	#endif
 	//////////////////////////////
 
