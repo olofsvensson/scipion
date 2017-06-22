@@ -97,6 +97,11 @@ void ProgMonoTomoRes::produceSideInfo()
 
 	int N_smoothing = 15;
 
+	// Prepare mask
+	MultidimArray<int> &pMask=mask();
+	pMask.resizeNoCopy(inputVol);
+	pMask.initConstant(1);
+
 	//Creating mask for smoothing
 	for (size_t i = 0; i< Xdim; i++)
 	{
@@ -105,13 +110,31 @@ void ProgMonoTomoRes::produceSideInfo()
 			for (size_t k = 0; k< Zdim; k++)
 			{
 				if ((i<= N_smoothing) || (i>= (Xdim - N_smoothing)))
+				{
 					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-i)/(N_smoothing)));
+					A3D_ELEM(pMask, k, i, j) = 0;
+				}
 				if ((j<= N_smoothing) || (j>= (Ydim - N_smoothing)))
+				{
 					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-j)/(N_smoothing)));
+					A3D_ELEM(pMask, k, i, j) = 0;
+				}
 				if ((k<= N_smoothing) || (k>= (Zdim - N_smoothing)))
+				{
 					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-k)/(N_smoothing)));
+					A3D_ELEM(pMask, k, i, j) = 0;
+				}
 			}
 		}
+	}
+
+
+
+	mask().initZeros(inputVol);
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pMask)
+	{
+		NVoxelsOriginalMask++;
+		DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
 	}
 
 	V.write("smoothed_volume.vol");
@@ -198,15 +221,7 @@ void ProgMonoTomoRes::produceSideInfo()
 	lowPassFilter.do_generate_3dmask = false;
 	lowPassFilter.FilterBand = LOWPASS;
 
-	// Prepare mask
-	MultidimArray<int> &pMask=mask();
 
-	mask().initZeros(inputVol);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pMask)
-	{
-		NVoxelsOriginalMask++;
-		DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-	}
 
 	V.clear();
 
