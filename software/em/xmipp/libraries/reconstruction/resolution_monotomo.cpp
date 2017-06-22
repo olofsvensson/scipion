@@ -370,7 +370,7 @@ void ProgMonoTomoRes::run()
 	MultidimArray<double> &pOutputResolution = outputResolution();
 	MultidimArray<double> &pVfiltered = Vfiltered();
 	MultidimArray<double> &pVresolutionFiltered = VresolutionFiltered();
-	MultidimArray<double> amplitudeMS, amplitudeMN, sliceS, sliceN, sliceMask;
+	MultidimArray<double> amplitudeMS, amplitudeMN, sliceS, sliceN, sliceMask, resolutionSlice;
 
 	std::cout << "Looking for maximum frequency ..." << std::endl;
 	double criticalZ=icdf_gauss(significance);
@@ -448,6 +448,7 @@ void ProgMonoTomoRes::run()
 			amplitudeMS.getSlice(ss, sliceS);
 			amplitudeMN.getSlice(ss, sliceN);
 			pMask.getSlice(ss, sliceMask);
+			pOutputResolution.getSlice(ss, resolutionSlice);
 
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sliceS)
 			{
@@ -489,7 +490,7 @@ void ProgMonoTomoRes::run()
 					if (DIRECT_MULTIDIM_ELEM(sliceS, n)>thresholdNoise)
 					{
 						DIRECT_MULTIDIM_ELEM(sliceMask, n) = 1;
-						DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution;//sampling/freq;
+						DIRECT_MULTIDIM_ELEM(resolutionSlice, n) = resolution;//sampling/freq;
 					}
 					else{
 
@@ -497,7 +498,7 @@ void ProgMonoTomoRes::run()
 						if (DIRECT_MULTIDIM_ELEM(sliceMask, n) >2)
 						{
 							DIRECT_MULTIDIM_ELEM(sliceMask, n) = -1;
-							DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution + counter*R_;//maxRes - counter*R_;
+							DIRECT_MULTIDIM_ELEM(resolutionSlice, n) = resolution + counter*R_;//maxRes - counter*R_;
 						}
 					}
 			}
@@ -508,6 +509,8 @@ void ProgMonoTomoRes::run()
 			if (z<criticalZ)
 				DIRECT_MULTIDIM_ELEM(meanSignal, ss) = -1;
 
+			pOutputResolution.setSlice(ss, resolutionSlice);
+			pMask.setSlice(ss, sliceMask);
 		}
 
 		if (resolution <= (minRes-0.001))
