@@ -35,6 +35,7 @@ void ProgMonoTomoRes::readParams()
 	fnEven = getParam("--even_volume");
 	fnTomo = getParam("--volume");
 	fnOut = getParam("-o");
+	fnMask = getParam("--mask");
 	fnchim = getParam("--chimera_volume");
 	sampling = getDoubleParam("--sampling_rate");
 	minRes = getDoubleParam("--minRes");
@@ -52,6 +53,9 @@ void ProgMonoTomoRes::defineParams()
 	addUsageLine("This function determines the local resolution of a map");
 	addParamsLine("  --odd_volume <vol_file=\"\">   : Input volume");
 	addParamsLine("  [--even_volume <vol_file=\"\">]: Half volume 2");
+	addParamsLine("  [--mask <vol_file=\"\">]  : Mask defining the macromolecule");
+	addParamsLine("                          :+ If two half volume are given, the noise is estimated from them");
+	addParamsLine("                          :+ Otherwise the noise is estimated outside the mask");
 	addParamsLine("  [-o <output=\"MGresolution.vol\">]: Local resolution volume (in Angstroms)");
 	addParamsLine("  [--volume <vol_file=\"\">]: Mean volume of half1 and half2 (only it is neccesary the two haves are used)");
 	addParamsLine("  --sym <symmetry>: Symmetry (c1, c2, c3,..d1, d2, d3,...)");
@@ -129,8 +133,6 @@ void ProgMonoTomoRes::produceSideInfo()
 	fftNoiseVol = fftVol;
 	fftVol.setSlice(0, fftSlice_aux);
 	fftNoiseVol.setSlice(0, fftNoise_aux);
-	std::cout << "Xdim = " << Xdim << "Ydim = " << Ydim << "Zdim = " << Zdim << std::endl;
-	std::cout << "Zdim_aux = " << Zdim_aux << std::endl;
 	fftVol.printShape();
 	fftNoiseVol.printShape();
 	for (size_t j = 1; j< Zdim; j++)
@@ -360,68 +362,6 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	}
 }
 
-/*
-void ProgMonoTomoRes::postProcessingLocalResolutions(MultidimArray<double> &resolutionVol,
-		std::vector<double> &list, MultidimArray<double> &resolutionChimera,
-		double &cut_value, MultidimArray<int> &pMask)
-{
-	std::cout << "post processing...." << std::endl;
-	MultidimArray<double> resolutionVol_aux = resolutionVol;
-	double last_resolution_2 = sampling/list[(list.size()-1)];
-	std::cout << "last_res = " << last_resolution_2 << std::endl;
-
-	// Count number of voxels with resolution
-	size_t N=0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001)) //the value 0.001 is a tolerance
-			++N;
-
-	std::cout << "post processing...." << std::endl;
-	// Get all resolution values
-	MultidimArray<double> resolutions(N);
-	std::cout << "N = " << N << std::endl;
-	size_t N_iter=0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001))
-			DIRECT_MULTIDIM_ELEM(resolutions,N_iter++)=DIRECT_MULTIDIM_ELEM(resolutionVol, n);
-	// Sort value and get threshold
-	std::cout << "post processing...." << std::endl;
-	std::sort(&A1D_ELEM(resolutions,0),&A1D_ELEM(resolutions,N));
-	double filling_value = A1D_ELEM(resolutions, (int)(0.5*N)); //median value
-	double trimming_value = A1D_ELEM(resolutions, (int)((1-cut_value)*N));
-
-	double freq, res, init_res, last_res;
-	std::cout << "post processing...." << std::endl;
-	init_res = sampling/list[0];
-	last_res = sampling/list[(list.size()-1)];
-	
-	std::cout << "--------------------------" << std::endl;
-	std::cout << "last_res = " << last_res << std::endl;
-
-	resolutionChimera = resolutionVol;
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
-	{
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n) < last_res)
-		{
-			DIRECT_MULTIDIM_ELEM(resolutionChimera, n) = filling_value;
-			DIRECT_MULTIDIM_ELEM(resolutionVol, n) = 0;
-			DIRECT_MULTIDIM_ELEM(pMask,n) = 0;
-		}
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n) >= trimming_value)
-		{
-		  DIRECT_MULTIDIM_ELEM(pMask,n) = 0;
-		  DIRECT_MULTIDIM_ELEM(resolutionVol, n) = 0;
-		}
-	}
-	//#ifdef DEBUG_MASK
-	Image<int> imgMask;
-	imgMask = pMask;
-	imgMask.write(fnMaskOut);
-	//#endif
-}
-
-*/
 void ProgMonoTomoRes::run()
 {
 	produceSideInfo();
