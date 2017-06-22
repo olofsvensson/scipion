@@ -39,7 +39,6 @@ void ProgMonoTomoRes::readParams()
 	sampling = getDoubleParam("--sampling_rate");
 	minRes = getDoubleParam("--minRes");
 	maxRes = getDoubleParam("--maxRes");
-	fnSym = getParam("--sym");
 	N_freq = getDoubleParam("--number_frequencies");
 	trimBound = getDoubleParam("--trimmed");
 	significance = getDoubleParam("--significance");
