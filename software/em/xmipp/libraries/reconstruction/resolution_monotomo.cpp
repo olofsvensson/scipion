@@ -87,13 +87,9 @@ void ProgMonoTomoRes::produceSideInfo()
 	}
 	//V().setXmippOrigin();
 
-
-
 	//Defining the volume
 	MultidimArray<double> &inputVol = V();
 	MultidimArray<double> noiseVolume;
-
-
 
 	//Defining the noise
 	V1()-=V2();
@@ -107,6 +103,20 @@ void ProgMonoTomoRes::produceSideInfo()
 	//Fourier transform slice by slice
 	size_t Ydim, Xdim, Zdim, Ndim, Ydim_aux, Xdim_aux, Zdim_aux, Ndim_aux;
 	inputVol.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	inputVol.printShape();
+
+	//Creating mask for smoothing
+//	for (size_t i = 1; i< Xdim; i++)
+//	{
+//		for (size_t j = 1; j< Ydim; j++)
+//		{
+//			for (size_t k = 1; k< Zdim; k++)
+//			{
+//
+//			}
+//		}
+//	}
+
 
 	MultidimArray<double> slice, sliceNoise, aux_slice, aux_noise;
 	MultidimArray< std::complex<double> > fftSlice, fftNoise, fftSlice_aux, fftNoise_aux;
