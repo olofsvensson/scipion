@@ -26,7 +26,7 @@
 
 #include "resolution_monotomo.h"
 
-//#define DEBUG
+#define DEBUG
 //#define DEBUG_MASK
 
 void ProgMonoTomoRes::readParams()
@@ -258,8 +258,17 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 	VRiesz.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	amplitudeVol.resizeNoCopy(Ndim, Zdim_aux, Ydim, Xdim);
 	amplitude.initZeros(VRiesz);
+	#ifdef DEBUG
+	MultidimArray<double> amplitudeVol_aux;
+	amplitudeVol_aux.initZeros(VRiesz);
+	#endif
 	//////////////////////////////
-	std::cout << Zdim_aux << std::endl;
+
+	#ifdef DEBUG
+	Image<double> filteredvolume;
+	filteredvolume().resizeNoCopy(amplitudeVol);
+	#endif
+
 	for (size_t ss = 0; ss < Zdim_aux; ss++)
 	{
 		//std::cout << ss << std::endl;
@@ -283,8 +292,8 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 		#ifdef DEBUG
 		Image<double> filteredvolume;
-		filteredvolume = VRiesz;
-		filteredvolume.write(formatString("Volumen_filtrado_%i.vol", count));
+		MultidimArray<double> filteredvolumeslice = VRiesz;
+		filteredvolume().setSlice(ss, filteredvolumeslice);
 		#endif
 
 		#ifdef DEBUG
@@ -373,35 +382,39 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 			DIRECT_MULTIDIM_ELEM(amplitude,n)=sqrt(DIRECT_MULTIDIM_ELEM(amplitude,n));
 		}
 
-		#ifdef DEBUG
-		if (fnDebug.c_str() != "")
-		{
-		Image<double> saveImg;
-		saveImg = amplitude;
-		iternumber = formatString("_Amplitude_%i.vol", count);
-		saveImg.write(fnDebug+iternumber);
-		saveImg.clear();
-		}
-		#endif // DEBUG
-	//
+	#ifdef DEBUG
+		amplitudeVol_aux.setSlice(ss, amplitude);
+	#endif
+
 		// Low pass filter the monogenic amplitude
 		lowPassFilter.w1 = w1;
 		amplitude.setXmippOrigin();
 		lowPassFilter.applyMaskSpace(amplitude);
 
-		#ifdef DEBUG
-		saveImg2 = amplitude;
-		FileName fnSaveImg2;
-		if (fnDebug.c_str() != "")
-		{
-			iternumber = formatString("_Filtered_Amplitude_%i.vol", count);
-			saveImg2.write(fnDebug+iternumber);
-		}
-		saveImg2.clear();
-		#endif // DEBUG
-
 		amplitudeVol.setSlice(ss, amplitude);
 	}
+
+	#ifdef DEBUG
+	FileName iternumber;
+	if (fnDebug.c_str() != "")
+	{
+		Image<double> saveImg;
+		saveImg = amplitudeVol_aux;
+		iternumber = formatString("_Amplitude_%i.vol", count);
+		saveImg.write(fnDebug+iternumber);
+		saveImg.clear();
+	}
+
+
+	Image<double> saveImg2;
+	filteredvolume.write(formatString("Volumen_filtrado_%i.vol", count));
+	if (fnDebug.c_str() != "")
+	{
+		iternumber = formatString("_Filtered_Amplitude_%i.vol", count);
+		saveImg2 = amplitudeVol;
+		saveImg2.write(fnDebug+iternumber);
+	}
+	#endif
 }
 
 
@@ -573,28 +586,11 @@ void ProgMonoTomoRes::run()
 			doNextIteration = false;
 
 
-
-
-		#ifdef DEBUG
-		std::cout << "NS" << NS << std::endl;
-		std::cout << "NVoxelsOriginalMask" << NVoxelsOriginalMask << std::endl;
-		std::cout << "NS/NVoxelsOriginalMask = " << NS/NVoxelsOriginalMask << std::endl;
-		#endif
-		#ifdef DEBUG
-		  std::cout << "Iteration = " << iter << ",   Resolution= " << resolution << ",   Signal = " << meanS << ",   Noise = " << meanN << ",  Threshold = " << thresholdNoise <<std::endl;
-		#endif
 		#ifdef DEBUG_MASK
 		FileName fnmask_debug;
 		fnmask_debug = formatString("maske_%i.vol", iter);
 		mask.write(fnmask_debug);
 		#endif
-		#ifdef DEBUG
-			std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
-			std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
-			std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
-			std::cout << "  z=" << z << " (" << criticalZ << ")" << std::endl;
-		#endif
-
 
 		iter++;
 	} while (doNextIteration);
