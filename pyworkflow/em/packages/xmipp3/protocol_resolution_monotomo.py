@@ -153,7 +153,6 @@ class XmippProtMonoTomo(ProtAnalysis3D):
         params += ' --minRes %f' % self.minRes.get()
         params += ' --maxRes %f' % self.maxRes.get()
         params += ' --chimera_volume %s' % self._getExtraPath(OUTPUT_RESOLUTION_FILE_CHIMERA)
-        params += ' --sym %s' % self.symmetry.get()
         params += ' --significance %f' % self.significance.get()
         params += ' --md_outputdata %s' % self._getExtraPath('mask_data.xmd')  
 
