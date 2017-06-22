@@ -105,17 +105,24 @@ void ProgMonoTomoRes::produceSideInfo()
 	inputVol.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	inputVol.printShape();
 
+	int N_smoothing = 5;
+
 	//Creating mask for smoothing
-//	for (size_t i = 1; i< Xdim; i++)
-//	{
-//		for (size_t j = 1; j< Ydim; j++)
-//		{
-//			for (size_t k = 1; k< Zdim; k++)
-//			{
-//
-//			}
-//		}
-//	}
+	for (size_t i = 0; i< Xdim; i++)
+	{
+		for (size_t j = 0; j< Ydim; j++)
+		{
+			for (size_t k = 0; k< Zdim; k++)
+			{
+				if ((i<= N_smoothing) || (i>= (Xdim - N_smoothing)))
+					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-i)/(N_smoothing)));
+				if ((j<= N_smoothing) || (j>= (Ydim - N_smoothing)))
+					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-j)/(N_smoothing)));
+				if ((k<= N_smoothing) || (k>= (Zdim - N_smoothing)))
+					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-k)/(N_smoothing)));
+			}
+		}
+	}
 
 
 	MultidimArray<double> slice, sliceNoise, aux_slice, aux_noise;
