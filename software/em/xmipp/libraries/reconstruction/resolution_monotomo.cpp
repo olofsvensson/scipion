@@ -357,71 +357,29 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 		amplitudeVol.setSlice(ss, amplitude);
 
+
+
+		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
+		noiseValues.clear();
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
+		{
+			double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitude, n);
+			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
+			{
+				sumS  += amplitudeValue;
+				sumS2 += amplitudeValue*amplitudeValue;
+				++NS;
+			}
+		}
+
+
+
+
 	}
 }
 
-/*
-void ProgMonoTomoRes::postProcessingLocalResolutions(MultidimArray<double> &resolutionVol,
-		std::vector<double> &list, MultidimArray<double> &resolutionChimera,
-		double &cut_value, MultidimArray<int> &pMask)
-{
-	std::cout << "post processing...." << std::endl;
-	MultidimArray<double> resolutionVol_aux = resolutionVol;
-	double last_resolution_2 = sampling/list[(list.size()-1)];
-	std::cout << "last_res = " << last_resolution_2 << std::endl;
 
-	// Count number of voxels with resolution
-	size_t N=0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001)) //the value 0.001 is a tolerance
-			++N;
-
-	std::cout << "post processing...." << std::endl;
-	// Get all resolution values
-	MultidimArray<double> resolutions(N);
-	std::cout << "N = " << N << std::endl;
-	size_t N_iter=0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n)>(last_resolution_2-0.001))
-			DIRECT_MULTIDIM_ELEM(resolutions,N_iter++)=DIRECT_MULTIDIM_ELEM(resolutionVol, n);
-	// Sort value and get threshold
-	std::cout << "post processing...." << std::endl;
-	std::sort(&A1D_ELEM(resolutions,0),&A1D_ELEM(resolutions,N));
-	double filling_value = A1D_ELEM(resolutions, (int)(0.5*N)); //median value
-	double trimming_value = A1D_ELEM(resolutions, (int)((1-cut_value)*N));
-
-	double freq, res, init_res, last_res;
-	std::cout << "post processing...." << std::endl;
-	init_res = sampling/list[0];
-	last_res = sampling/list[(list.size()-1)];
-	
-	std::cout << "--------------------------" << std::endl;
-	std::cout << "last_res = " << last_res << std::endl;
-
-	resolutionChimera = resolutionVol;
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(resolutionVol)
-	{
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n) < last_res)
-		{
-			DIRECT_MULTIDIM_ELEM(resolutionChimera, n) = filling_value;
-			DIRECT_MULTIDIM_ELEM(resolutionVol, n) = 0;
-			DIRECT_MULTIDIM_ELEM(pMask,n) = 0;
-		}
-		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n) >= trimming_value)
-		{
-		  DIRECT_MULTIDIM_ELEM(pMask,n) = 0;
-		  DIRECT_MULTIDIM_ELEM(resolutionVol, n) = 0;
-		}
-	}
-	//#ifdef DEBUG_MASK
-	Image<int> imgMask;
-	imgMask = pMask;
-	imgMask.write(fnMaskOut);
-	//#endif
-}
-
-*/
 void ProgMonoTomoRes::run()
 {
 	produceSideInfo();
@@ -460,7 +418,7 @@ void ProgMonoTomoRes::run()
 	std::vector<double> list;
 
 	std::cout << "Analyzing frequencies" << std::endl;
-	std::vector<double> noiseValues;
+
 	FileName fnDebug;
 
 	do
@@ -485,34 +443,13 @@ void ProgMonoTomoRes::run()
 
 		fnDebug = "Signal";
 
-		std::cout << "amplitude signal " << std::endl;
 		amplitudeMonogenicSignal3D(fftVol, freq, freqH, freqL, amplitudeMS, iter, fnDebug);
 		amplitudeMonogenicSignal3D(fftNoiseVol, freq, freqH, freqL, amplitudeMN, iter, fnDebug);
-		std::cout << "amplitude noise finished " << std::endl;
 
 
 		list.push_back(freq);
 
-		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
-		noiseValues.clear();
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-		{
-			double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-			double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
-			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-			{
-				sumS  += amplitudeValue;
-				sumS2 += amplitudeValue*amplitudeValue;
-				++NS;
-			}
-			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=0)
-			{
-				sumN  += amplitudeValueN;
-				sumN2 += amplitudeValueN*amplitudeValueN;
-				++NN;
-			}
-		}
 	
 		#ifdef DEBUG
 		std::cout << "NS" << NS << std::endl;

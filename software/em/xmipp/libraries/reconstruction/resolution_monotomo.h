@@ -87,6 +87,7 @@ public:
 	FourierTransformer transformer_inv;
 	MultidimArray< std::complex<double> > fftVRiesz;
 	FourierFilter lowPassFilter, FilterBand;
+	std::vector<double> noiseValues;
 	bool halfMapsGiven;
 	Image<double> Vfiltered, VresolutionFiltered;
 };
