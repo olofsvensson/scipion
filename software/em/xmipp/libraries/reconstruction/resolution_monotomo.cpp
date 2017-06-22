@@ -275,6 +275,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		myfftV.getSlice(ss, fftSlice);
 		long n=0;
 		fftVRiesz.initZeros(fftSlice);
+		std::cout << "here 0 "<< std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(fftSlice)
 		{
 			double iun=DIRECT_MULTIDIM_ELEM(iu,n);
@@ -287,7 +288,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 			} else if (un>w1)
 				DIRECT_MULTIDIM_ELEM(fftVRiesz, n) = DIRECT_MULTIDIM_ELEM(fftSlice, n);
 		}
-
+		std::cout << "here 1 "<< std::endl;
 		transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
 
 		#ifdef DEBUG
@@ -308,7 +309,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		saveImg2.clear();
 		#endif
 
-
+		std::cout << "here 2 "<< std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
 		DIRECT_MULTIDIM_ELEM(amplitude,n)=DIRECT_MULTIDIM_ELEM(VRiesz,n)*DIRECT_MULTIDIM_ELEM(VRiesz,n);
 
@@ -316,7 +317,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		fftVRiesz.initZeros(fftSlice);
 		double uz, uy, ux;
 		n=0;
-
+		std::cout << "here 3 "<< std::endl;
 		for(size_t j=0; j<XSIZE(fftSlice); ++j)
 		{
 			FFT_IDX2DIGFREQ(j,YSIZE(amplitude),ux);
@@ -341,11 +342,11 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 					++n;
 				}
 		}
-
+		std::cout << "here 4 "<< std::endl;
 		transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
 		DIRECT_MULTIDIM_ELEM(amplitude,n)+=DIRECT_MULTIDIM_ELEM(VRiesz,n)*DIRECT_MULTIDIM_ELEM(VRiesz,n);
-
+		std::cout << "here 5 "<< std::endl;
 		// Calculate second component of Riesz vector
 		fftVRiesz.initZeros(fftSlice);
 		n=0;
@@ -374,14 +375,14 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 					++n;
 				}
 		}
-
+		std::cout << "here 6 "<< std::endl;
 		transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
 		{
 			DIRECT_MULTIDIM_ELEM(amplitude,n)+=DIRECT_MULTIDIM_ELEM(VRiesz,n)*DIRECT_MULTIDIM_ELEM(VRiesz,n);
 			DIRECT_MULTIDIM_ELEM(amplitude,n)=sqrt(DIRECT_MULTIDIM_ELEM(amplitude,n));
 		}
-
+		std::cout << "here 7 "<< std::endl;
 	#ifdef DEBUG
 		amplitudeVol_aux.setSlice(ss, amplitude);
 	#endif
@@ -391,6 +392,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		amplitude.setXmippOrigin();
 		lowPassFilter.applyMaskSpace(amplitude);
 
+		std::cout << "here 8 "<< std::endl;
 		amplitudeVol.setSlice(ss, amplitude);
 	}
 
