@@ -109,19 +109,35 @@ void ProgMonoTomoRes::produceSideInfo()
 		{
 			for (size_t k = 0; k< Zdim; k++)
 			{
-				if ((i<= N_smoothing) || (i>= (Xdim - N_smoothing)))
+				if (i<= N_smoothing)
 				{
 					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-i)/(N_smoothing)));
 					A3D_ELEM(pMask, k, i, j) = 0;
 				}
-				if ((j<= N_smoothing) || (j>= (Ydim - N_smoothing)))
+				if (j<= N_smoothing)
 				{
 					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-j)/(N_smoothing)));
 					A3D_ELEM(pMask, k, i, j) = 0;
 				}
-				if ((k<= N_smoothing) || (k>= (Zdim - N_smoothing)))
+				if (k<= N_smoothing)
 				{
 					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing-k)/(N_smoothing)));
+					A3D_ELEM(pMask, k, i, j) = 0;
+				}
+
+				if (i>= (Xdim - N_smoothing))
+				{
+					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing+Xdim-i)/(N_smoothing)));
+					A3D_ELEM(pMask, k, i, j) = 0;
+				}
+				if (j>= (Ydim - N_smoothing))
+				{
+					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing+Ydim-j)/(N_smoothing)));
+					A3D_ELEM(pMask, k, i, j) = 0;
+				}
+				if (k>= (Zdim - N_smoothing))
+				{
+					A3D_ELEM(inputVol, k, i, j) = A3D_ELEM(inputVol, k, i, j)*0.5*(1+cos(PI*(N_smoothing+Zdim-k)/(N_smoothing)));
 					A3D_ELEM(pMask, k, i, j) = 0;
 				}
 			}
