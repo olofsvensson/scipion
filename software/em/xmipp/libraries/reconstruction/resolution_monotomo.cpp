@@ -95,7 +95,7 @@ void ProgMonoTomoRes::produceSideInfo()
 	inputVol.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	inputVol.printShape();
 
-	int N_smoothing = 5;
+	int N_smoothing = 15;
 
 	//Creating mask for smoothing
 	for (size_t i = 0; i< Xdim; i++)
