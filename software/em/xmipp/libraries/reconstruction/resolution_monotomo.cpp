@@ -54,7 +54,6 @@ void ProgMonoTomoRes::defineParams()
 	addParamsLine("  [--even_volume <vol_file=\"\">]: Half volume 2");
 	addParamsLine("  [-o <output=\"MGresolution.vol\">]: Local resolution volume (in Angstroms)");
 	addParamsLine("  [--volume <vol_file=\"\">]: Mean volume of half1 and half2 (only it is neccesary the two haves are used)");
-	addParamsLine("  --sym <symmetry>: Symmetry (c1, c2, c3,..d1, d2, d3,...)");
 	addParamsLine("  [--chimera_volume <output=\"Chimera_resolution_volume.vol\">]: Local resolution volume for chimera viewer (in Angstroms)");
 	addParamsLine("  [--sampling_rate <s=1>]   : Sampling rate (A/px)");
 	addParamsLine("                            : Use -1 to disable this option");
@@ -109,7 +108,6 @@ void ProgMonoTomoRes::produceSideInfo()
 	//Fourier transform slice by slice
 	size_t Ydim, Xdim, Zdim, Ndim, Ydim_aux, Xdim_aux, Zdim_aux, Ndim_aux;
 	inputVol.getDimensions(Xdim, Ydim, Zdim, Ndim);
-	inputVol.printShape();
 
 	MultidimArray<double> slice, sliceNoise, aux_slice, aux_noise;
 	MultidimArray< std::complex<double> > fftSlice, fftNoise, fftSlice_aux, fftNoise_aux;
@@ -198,6 +196,7 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 
 	//fftVRiesz.initZeros(myfftV);
 	MultidimArray<double>  amplitude;
+	MultidimArray<int>  &pMask = mask();
 
 	std::complex<double> J(0,1);
 
@@ -356,26 +355,6 @@ void ProgMonoTomoRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<dou
 		#endif // DEBUG
 
 		amplitudeVol.setSlice(ss, amplitude);
-
-
-
-		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
-		noiseValues.clear();
-
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitude)
-		{
-			double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitude, n);
-			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-			{
-				sumS  += amplitudeValue;
-				sumS2 += amplitudeValue*amplitudeValue;
-				++NS;
-			}
-		}
-
-
-
-
 	}
 }
 
@@ -385,20 +364,21 @@ void ProgMonoTomoRes::run()
 	produceSideInfo();
 
 	Image<double> outputResolution;
-	outputResolution().initZeros(mask());
+	outputResolution().resizeNoCopy(mask());
+	outputResolution().initConstant(maxRes);
 
 	MultidimArray<int> &pMask = mask();
 	MultidimArray<double> &pOutputResolution = outputResolution();
 	MultidimArray<double> &pVfiltered = Vfiltered();
 	MultidimArray<double> &pVresolutionFiltered = VresolutionFiltered();
-	MultidimArray<double> amplitudeMS, amplitudeMN;
+	MultidimArray<double> amplitudeMS, amplitudeMN, sliceS, sliceN, sliceMask;
 
 	std::cout << "Looking for maximum frequency ..." << std::endl;
 	double criticalZ=icdf_gauss(significance);
 	double criticalW=-1;
 	double resolution, last_resolution = 10000;  //A huge value for achieving last_resolution < resolution
 	double freq, freqH, freqL, resVal, counter;
-	double max_meanS = -1e38;
+	double max_mean = -1e38;
 	double cut_value = 0.025;
 
 	double range = maxRes-minRes;
@@ -420,6 +400,15 @@ void ProgMonoTomoRes::run()
 	std::cout << "Analyzing frequencies" << std::endl;
 
 	FileName fnDebug;
+	size_t Xdim, Ydim, Zdim_aux, Ndim;
+	pOutputResolution.getDimensions(Xdim, Ydim, Zdim_aux, Ndim);
+	MultidimArray<double> meanSignal(Zdim_aux);
+	MultidimArray<double> meanNoise(Zdim_aux);
+	MultidimArray<double> max_meanS(Zdim_aux);
+
+	max_meanS.initConstant(max_mean);
+	meanNoise.initConstant(max_mean);
+	meanSignal.initConstant(max_mean);
 
 	do
 	{
@@ -449,88 +438,114 @@ void ProgMonoTomoRes::run()
 
 		list.push_back(freq);
 
+		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
+		noiseValues.clear();
 
-	
+		for (size_t ss=0; ss<Zdim_aux; ss++)
+		{
+			if (DIRECT_MULTIDIM_ELEM(meanSignal, ss) == -1)
+				continue;
+
+			amplitudeMS.getSlice(ss, sliceS);
+			amplitudeMN.getSlice(ss, sliceN);
+			pMask.getSlice(ss, sliceMask);
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sliceS)
+			{
+				double amplitudeValue=DIRECT_MULTIDIM_ELEM(sliceS, n);
+				double amplitudeValueNoise=DIRECT_MULTIDIM_ELEM(sliceN, n);
+				if (DIRECT_MULTIDIM_ELEM(sliceMask, n)>=1)
+				{
+					sumS  += amplitudeValue;
+					sumS2 += amplitudeValue*amplitudeValue;
+					++NS;
+				}
+				if (DIRECT_MULTIDIM_ELEM(sliceMask, n)>=1)
+				{
+					sumN  += amplitudeValueNoise;
+					sumN2 += amplitudeValueNoise*amplitudeValueNoise;
+					++NN;
+				}
+			}
+			double meanS=sumS/NS;
+			double sigma2S=sumS2/NS-meanS*meanS;
+			double meanN=sumN/NN;
+			double sigma2N=sumN2/NN-meanN*meanN;
+
+			if (meanS>DIRECT_MULTIDIM_ELEM(max_meanS, ss))
+				DIRECT_MULTIDIM_ELEM(max_meanS, ss) = meanS;
+			if (meanS<0.001*DIRECT_MULTIDIM_ELEM(max_meanS, ss))
+				DIRECT_MULTIDIM_ELEM(meanSignal, ss) = -1;
+			if (NS == 0)
+				DIRECT_MULTIDIM_ELEM(meanSignal, ss) = -1;
+
+
+			// Check local resolution
+			double thresholdNoise;
+			thresholdNoise = meanN+criticalZ*sqrt(sigma2N);
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sliceS)
+			{
+				if (DIRECT_MULTIDIM_ELEM(sliceMask, n)>=1)
+					if (DIRECT_MULTIDIM_ELEM(sliceS, n)>thresholdNoise)
+					{
+						DIRECT_MULTIDIM_ELEM(sliceMask, n) = 1;
+						DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution;//sampling/freq;
+					}
+					else{
+
+						DIRECT_MULTIDIM_ELEM(sliceMask, n) = DIRECT_MULTIDIM_ELEM(sliceMask, n) + 1;
+						if (DIRECT_MULTIDIM_ELEM(sliceMask, n) >2)
+						{
+							DIRECT_MULTIDIM_ELEM(sliceMask, n) = -1;
+							DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution + counter*R_;//maxRes - counter*R_;
+						}
+					}
+			}
+
+			// Is the mean inside the signal significantly different from the noise?
+			double z=(meanS-meanN)/sqrt(sigma2S/NS+sigma2N/NN);
+
+			if (z<criticalZ)
+				DIRECT_MULTIDIM_ELEM(meanSignal, ss) = -1;
+
+		}
+
+		if (resolution <= (minRes-0.001))
+			doNextIteration = false;
+
+		double cutoff = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(meanSignal)
+		{
+			cutoff += DIRECT_MULTIDIM_ELEM(meanSignal, n);
+		}
+
+		if (cutoff == - Zdim_aux)
+			doNextIteration = false;
+
+
+
+
 		#ifdef DEBUG
 		std::cout << "NS" << NS << std::endl;
 		std::cout << "NVoxelsOriginalMask" << NVoxelsOriginalMask << std::endl;
 		std::cout << "NS/NVoxelsOriginalMask = " << NS/NVoxelsOriginalMask << std::endl;
 		#endif
-		
-		if (NS == 0)
-		{
-			std::cout << "There are no points to compute inside the mask" << std::endl;
-			std::cout << "If the number of computed frequencies is low, perhaps the provided"
-					"mask is not enough tight to the volume, in that case please try another mask" << std::endl;
-			break;
-		}
-
-		double meanS=sumS/NS;
-		double sigma2S=sumS2/NS-meanS*meanS;
-		double meanN=sumN/NN;
-		double sigma2N=sumN2/NN-meanN*meanN;
-
-		if (meanS>max_meanS)
-			max_meanS = meanS;
-
-		if (meanS<0.001*max_meanS)
-		{
-			std::cout << "Search of resolutions stopped due to too low signal" << std::endl;
-			break;
-		}
-
-		// Check local resolution
-		double thresholdNoise;
-		thresholdNoise = meanN+criticalZ*sqrt(sigma2N);
-
 		#ifdef DEBUG
 		  std::cout << "Iteration = " << iter << ",   Resolution= " << resolution << ",   Signal = " << meanS << ",   Noise = " << meanN << ",  Threshold = " << thresholdNoise <<std::endl;
 		#endif
-
-		std::cout << "calculating is is higher than threshold" << std::endl;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-		{
-			if (DIRECT_MULTIDIM_ELEM(pMask, n)>=1)
-				if (DIRECT_MULTIDIM_ELEM(amplitudeMS, n)>thresholdNoise)
-				{
-					DIRECT_MULTIDIM_ELEM(pMask, n) = 1;
-					DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution;//sampling/freq;
-				}
-				else{
-
-					DIRECT_MULTIDIM_ELEM(pMask, n) = DIRECT_MULTIDIM_ELEM(pMask, n) + 1;
-					if (DIRECT_MULTIDIM_ELEM(pMask, n) >2)
-					{
-						DIRECT_MULTIDIM_ELEM(pMask, n) = -1;
-						DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = resolution + counter*R_;//maxRes - counter*R_;
-					}
-				}
-		}
-		std::cout << "after if it is higher than threshold" << std::endl;
 		#ifdef DEBUG_MASK
 		FileName fnmask_debug;
 		fnmask_debug = formatString("maske_%i.vol", iter);
 		mask.write(fnmask_debug);
 		#endif
-
-		// Is the mean inside the signal significantly different from the noise?
-		double z=(meanS-meanN)/sqrt(sigma2S/NS+sigma2N/NN);
 		#ifdef DEBUG
 			std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
 			std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
 			std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
 			std::cout << "  z=" << z << " (" << criticalZ << ")" << std::endl;
 		#endif
-		if (z<criticalZ)
-		{
-			criticalW = freq;
-			doNextIteration=false;
-		}
-		if (doNextIteration)
-		{
-			if (resolution <= (minRes-0.001))
-				doNextIteration = false;
-		}
+
 
 		iter++;
 	} while (doNextIteration);
@@ -540,15 +555,6 @@ void ProgMonoTomoRes::run()
 	amplitudeMS.clear();
 
 	double last_resolution_2 = resolution;
-	if (fnSym!="c1")
-	{
-		SymList SL;
-		SL.readSymmetryFile(fnSym);
-		MultidimArray<double> VSimetrized;
-		symmetrizeVolume(SL, pOutputResolution, VSimetrized, LINEAR, DONT_WRAP);
-		outputResolution() = VSimetrized;
-		VSimetrized.clear();
-	}
 
 	#ifdef DEBUG
 		outputResolution.write("resolution_simple_simmetrized.vol");

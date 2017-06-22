@@ -75,12 +75,6 @@ class XmippProtMonoTomo(ProtAnalysis3D):
                       help='Select a second volume for determining a local resolution.')
 
         group = form.addGroup('Extra parameters')
-        group.addParam('symmetry', StringParam, default='c1',
-                      label="Symmetry",
-                      help='Symmetry group. By default = c1.'
-                      'See [[http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/Symmetry][Symmetry]]'
-                      'for a description of the symmetry groups format, If no symmetry is present, give c1.')
-
         line = group.addLine('Resolution Range (A)',
                             help="If the user knows the range of resolutions or only a"
                                  " range of frequency needs to be analysed")
@@ -91,7 +85,7 @@ class XmippProtMonoTomo(ProtAnalysis3D):
                       'the significance of that test')
         
         line.addParam('minRes', FloatParam, default=1, label='High')
-        line.addParam('maxRes', FloatParam, default=30, label='Low')
+        line.addParam('maxRes', FloatParam, default=100, label='Low')
         line.addParam('stepSize', FloatParam, allowsNull=True,
                       expertLevel=LEVEL_ADVANCED, label='Step')
 
