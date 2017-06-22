@@ -91,16 +91,6 @@ void ProgMonoTomoRes::produceSideInfo()
 	MultidimArray<double> &inputVol = V();
 	MultidimArray<double> noiseVolume;
 
-	//Defining the noise
-	V1()-=V2();
-	noiseVolume = V1()/2;
-	Image<double> savenoise = noiseVolume;
-	savenoise.write("noise_volume.vol");
-
-	V1.clear();
-	V2.clear();
-
-	//Fourier transform slice by slice
 	size_t Ydim, Xdim, Zdim, Ndim, Ydim_aux, Xdim_aux, Zdim_aux, Ndim_aux;
 	inputVol.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	inputVol.printShape();
@@ -123,6 +113,24 @@ void ProgMonoTomoRes::produceSideInfo()
 			}
 		}
 	}
+
+	V.write("smoothed_volume.vol");
+
+
+	//Defining the noise
+	V1()-=V2();
+	noiseVolume = V1()/2;
+	Image<double> savenoise = noiseVolume;
+	savenoise.write("noise_volume.vol");
+
+	V1.clear();
+	V2.clear();
+
+	//Fourier transform slice by slice
+
+
+
+
 
 
 	MultidimArray<double> slice, sliceNoise, aux_slice, aux_noise;
