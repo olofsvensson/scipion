@@ -69,7 +69,7 @@ def initGPU():
 class ProtMonitorSystem(ProtMonitor):
     """ check CPU, mem and IO usage.
     """
-    _label = 'system_monitor'
+    _label = 'monitor_system'
     _lastUpdateVersion = VERSION_1_1
 
     #get list with network interfaces
@@ -356,24 +356,43 @@ class MonitorSystem(Monitor):
         #remove last comma and new line
         sqlCommand = sqlCommand[:-2]
         sqlCommand +=")"
-        print("sqlCommand",sqlCommand)
+        #print("sqlCommand",sqlCommand)
         self.cur.execute(sqlCommand)
 
     def getLabels(self):
         return self.labelList
 
+    def checkTableExists(self, tablename):
+        cur = self.cur
+        try:
+            cur.execute("select count(*) FROM log")
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM sqlite_master
+                WHERE type='table' AND name = '%s'
+                """%tablename)
+            if cur.fetchone()[0] == 1:
+                return True
+        except Exception,e:
+            print str(e)
+            return False
+        return False
+
     def getData(self):
         cur = self.cur
         # I guess this can be done in a single call
         # I am storing the first meassurement
-        cur.execute("select julianday(timestamp)  from %s where id=1" %
-                    self._tableName )
-        initTime = cur.fetchone()[0]
-        cur.execute("select timestamp  from %s where id=1" % self._tableName)
-        initTimeTitle = cur.fetchone()[0]
-        cur.execute("select (julianday(timestamp) - %f)*24  from %s" %
-                    (initTime,self._tableName) )
-        idValues = [r[0] for r in cur.fetchall()]
+        try:
+            cur.execute("select julianday(timestamp)  from %s where id=1" %
+                        self._tableName )
+            initTime = cur.fetchone()[0]
+            cur.execute("select timestamp  from %s where id=1" % self._tableName)
+            initTimeTitle = cur.fetchone()[0]
+            cur.execute("select (julianday(timestamp) - %f)*24.*60.  from %s" %
+                        (initTime,self._tableName) )
+            idValues = [r[0] for r in cur.fetchall()]
+        except:
+            return  False
 
         def get(name):
             try:
@@ -398,7 +417,7 @@ from matplotlib import animation
 
 class ProtMonitorSystemViewer(Viewer):
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
-    _label = 'system monitor'
+    _label = 'monitor system'
     _targets = [ProtMonitorSystem]
 
     def __init__(self, **args):
@@ -406,25 +425,26 @@ class ProtMonitorSystemViewer(Viewer):
 
     def _visualize(self, obj, **kwargs):
         return [SystemMonitorPlotter(obj.createMonitor(),
-                                     nifName=self.protocol.nifsNameList[self.protocol.netInterfaces.get()]
+                                     nifName=self.protocol.nifsNameList[self.protocol.netInterfaces.get()],
+                                     tableName = self.protocol.tableName
                                      )
                 ]
 
 
 class SystemMonitorPlotter(EmPlotter):
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
-    _label = 'System Monitor'
+    _label = 'Monitor System'
     _targets = [ProtMonitorSystem]
 
-    def __init__(self, monitor, nifName=None):
-        EmPlotter.__init__(self, windowTitle="system Monitor")
+    def __init__(self, monitor, nifName=None, tableName="log"):
+        EmPlotter.__init__(self, windowTitle="Monitor: System")
         self.monitor = monitor
         self.y2 = 0.
         self.y1 = 100.
         self.win = 250 # number of samples to be ploted
         self.step = 50 # self.win  will be modified in steps of this size
         self.createSubPlot(self._getTitle(),
-                           "time (hours)", "percentage (or MB for IO or NetWork)")
+                           "time (minutes)", "percentage (or MB for IO or NetWork)")
         self.fig = self.getFigure()
         self.ax = self.getLastSubPlot()
         self.ax.margins(0.05)
@@ -436,7 +456,15 @@ class SystemMonitorPlotter(EmPlotter):
         self.stop = False
 
         self.nifName = nifName
+        self.tableName = tableName
 
+#    def validate(self):
+#        """check if we have collected at least two data points"""
+#        data = self.monitor.getData()
+#        x = data['idValues']
+#        if len(x) < 2:
+#            msg = "Cannot plot the data since less than 2 samples has been collected.\n Try again later"
+#            errorWindow(None, msg)
 
     def _getTitle(self):
         return ("Use scrool wheel to change view window (win=%d)\n "
@@ -542,7 +570,6 @@ class SystemMonitorPlotter(EmPlotter):
         return fig not in active_fig_managers
 
     def animate(self,i=0): #do NOT remove i
-
         if self.stop:
             return
 
@@ -587,5 +614,27 @@ class SystemMonitorPlotter(EmPlotter):
             self.oldColor[key] = colortypes[counter%lenColortypes]
             counter += 1
         self.lenPlots=len(self.color)
+        #chek table exists.
+        retryTimeSec=5
+        if self.monitor.checkTableExists(self.tableName):
+            data = self.monitor.getData()
+        else:
+            data = False
+        error = True
+        while (not data) or \
+              ('idValues' not in data or \
+              (len(data['idValues'])< 2) \
+            ):
+            if self.monitor.checkTableExists(self.tableName):
+                data = self.monitor.getData()
+            if error:
+                msg = """Cannot plot the data since less than 2 samples has been collected.
+I will retry each %d seconds. Do not press Analyze Results again!"""%retryTimeSec
+                errorWindow(None, msg)
+                EmPlotter.show(self)#if show is not called the error window remains
+            time.sleep(5) # wait until the log table has been created
+                          # and data collected
+            error = False
+
         self.paint(self.monitor.getLabels())
 
