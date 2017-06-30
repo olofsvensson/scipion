@@ -39,7 +39,7 @@ class ProtMonitorSummary(ProtMonitor):
     - Align movies (global and/or local)
     - CTF estimation.
     """
-    _label = 'monitor summary'
+    _label = 'monitor-facility'
 
     _lastUpdateVersion = VERSION_1_1
     nifs = getnifs.get_network_interfaces()

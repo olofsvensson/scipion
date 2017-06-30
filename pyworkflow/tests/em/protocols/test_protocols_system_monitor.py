@@ -37,7 +37,7 @@ class TestStress(BaseTest):
         """
 
         # Check stress-ng is installed
-        print "Command exists?&&&&&&&&&&&&&&&&&&& %s" % commandExists(STRESS_NG)
+        print "Command exists? %s" % commandExists(STRESS_NG)
         self.assertTrue(commandExists(STRESS_NG), "This test requires to have %s installed" % STRESS_NG)
 
         kwargs = {'noCpu': 2,

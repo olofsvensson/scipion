@@ -69,7 +69,7 @@ def initGPU():
 class ProtMonitorSystem(ProtMonitor):
     """ check CPU, mem and IO usage.
     """
-    _label = 'monitor_system'
+    _label = 'monitor-system'
     _lastUpdateVersion = VERSION_1_1
 
     #get list with network interfaces

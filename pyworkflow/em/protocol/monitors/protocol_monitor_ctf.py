@@ -45,7 +45,7 @@ CTF_LOG_SQLITE = 'ctf_log.sqlite'
 class ProtMonitorCTF(ProtMonitor):
     """ check CPU, mem and IO usage.
     """
-    _label = 'ctf monitor'
+    _label = 'monitor-CTF'
     _lastUpdateVersion = VERSION_1_1
     #--------------------------- DEFINE param functions ----------------------
     def _defineParams(self, form):    

@@ -43,7 +43,7 @@ from ispyb_proxy import ISPyBProxy
 class ProtMonitorISPyB(ProtMonitor):
     """ Monitor to communicated with ISPyB system at Diamond.
     """
-    _label = 'monitor to ISPyB'
+    _label = 'monitor-ISPyB'
     _lastUpdateVersion = VERSION_1_1
 
     def _defineParams(self, form):
