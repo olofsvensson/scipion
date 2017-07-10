@@ -36,7 +36,7 @@ try:
 except ImportError:
    print "Cannot import psutil module - this is needed for this application.";
    print "Exiting..."
-   sys.exit();
+   sys.exit()
 
 from pyworkflow import VERSION_1_1
 from pyworkflow.gui.plotter import plt
@@ -44,8 +44,7 @@ from pyworkflow.protocol.constants import STATUS_RUNNING, STATUS_FINISHED
 from pyworkflow.protocol import getProtocolFromDb
 from pyworkflow.em.plotter import EmPlotter
 from tkMessageBox import showerror
-
-from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex,\
+from pyworkflow.em.protocol.monitors.pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex,\
     nvmlDeviceGetName, nvmlDeviceGetMemoryInfo, nvmlDeviceGetUtilizationRates,\
     NVMLError, nvmlDeviceGetTemperature, NVML_TEMPERATURE_GPU,\
     nvmlDeviceGetComputeRunningProcesses
@@ -65,6 +64,14 @@ def errorWindow(tkParent, msg):
 def initGPU():
     nvmlInit()
 
+def getNetworkInterfaces():
+    nifs = getnifs.get_network_interfaces()
+    nifsNameList = []
+    for nif in nifs:
+        nifName = nif.getName()
+        if nifName != "lo": #value comparison
+            nifsNameList.append(nifName)
+    return nifsNameList
 
 class ProtMonitorSystem(ProtMonitor):
     """ check CPU, mem and IO usage.
@@ -73,13 +80,7 @@ class ProtMonitorSystem(ProtMonitor):
     _lastUpdateVersion = VERSION_1_1
 
     #get list with network interfaces
-    nifs = getnifs.get_network_interfaces()
-    nifsNameList = []
-    for nif in nifs:
-        nifName = nif.getName()
-        if nifName != "lo": #value comparison
-            nifsNameList.append(nifName)
-    #nifsNameList = [nif.getName() for nif in nifs]
+    nifsNameList = getNetworkInterfaces()
     nifsNameList.append("all")
 
     def __init__(self, **kwargs):
@@ -441,7 +442,8 @@ class ProtMonitorSystemViewer(Viewer):
 
     def _visualize(self, obj, **kwargs):
         return [SystemMonitorPlotter(obj.createMonitor(),
-                                     nifName=self.protocol.nifsNameList[self.protocol.netInterfaces.get()],
+                                     nifList=self.protocol.nifsNameList,
+                                     nifName=self.protocol.netInterfaces.get(),
                                      tableName = self.protocol.tableName
                                      )
                 ]
@@ -452,7 +454,7 @@ class SystemMonitorPlotter(EmPlotter):
     _label = 'Monitor System'
     _targets = [ProtMonitorSystem]
 
-    def __init__(self, monitor, nifName=None, tableName="log"):
+    def __init__(self, monitor, nifList, nifName=None, tableName="log"):
         EmPlotter.__init__(self, windowTitle="Monitor: System")
         self.monitor = monitor
         self.y2 = 0.
@@ -472,6 +474,10 @@ class SystemMonitorPlotter(EmPlotter):
         self.stop = False
 
         self.nifName = nifName
+        if self.nifName == 'all':
+            self.nifList = self.nifList[:-1]  # remove word "all"
+        else:
+            self.nifList = [self.nifName]
         self.tableName = tableName
 
 #    def validate(self):
@@ -538,14 +544,15 @@ class SystemMonitorPlotter(EmPlotter):
 
         def netKey(key):
             self.colorChanged=True
-            if self.color['%s_send'%self.nifName] != 'w':
-                self.oldColor['%s_send'%self.nifName] = self.color['%s_send'%self.nifName]
-                self.oldColor['%s_recv'%self.nifName] = self.color['%s_recv'%self.nifName]
-                self.color['%s_send'%self.nifName]="w"
-                self.color['%s_recv'%self.nifName]="w"
-            else:
-                self.color['%s_send'%self.nifName] = self.oldColor['%s_send'%self.nifName]
-                self.color['%s_recv'%self.nifName] = self.oldColor['%s_recv'%self.nifName]
+            for nifName in self.nifList:
+                if self.color['%s_send'%nifName] != 'w':
+                    self.oldColor['%s_send'%nifName] = self.color['%s_send'%nifName]
+                    self.oldColor['%s_recv'%nifName] = self.color['%s_recv'%nifName]
+                    self.color['%s_send'%nifName]="w"
+                    self.color['%s_recv'%nifName]="w"
+                else:
+                    self.color['%s_send'%nifName] = self.oldColor['%s_send'%nifName]
+                    self.color['%s_recv'%nifName] = self.oldColor['%s_recv'%nifName]
 
         def diskKey(key):
             self.colorChanged=True
