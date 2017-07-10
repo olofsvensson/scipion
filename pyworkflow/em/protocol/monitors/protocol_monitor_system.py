@@ -30,13 +30,13 @@ import pyworkflow.protocol.params as params
 from protocol_monitor import ProtMonitor, Monitor
 import sqlite3 as lite
 import getnifs
+import sys, time
 try:
    import psutil
 except ImportError:
    print "Cannot import psutil module - this is needed for this application.";
    print "Exiting..."
    sys.exit();
-import sys, time
 
 from pyworkflow import VERSION_1_1
 from pyworkflow.gui.plotter import plt
@@ -74,7 +74,13 @@ class ProtMonitorSystem(ProtMonitor):
 
     #get list with network interfaces
     nifs = getnifs.get_network_interfaces()
-    nifsNameList = [nif.getName() for nif in nifs]
+    nifsNameList = []
+    for nif in nifs:
+        nifName = nif.getName()
+        if nifName != "lo": #value comparison
+            nifsNameList.append(nifName)
+    #nifsNameList = [nif.getName() for nif in nifs]
+    nifsNameList.append("all")
 
     def __init__(self, **kwargs):
         ProtMonitor.__init__(self, **kwargs)
@@ -125,7 +131,7 @@ class ProtMonitorSystem(ProtMonitor):
                        label="Check Network",
                        help="Set to true if you want to monitor the Network")
         group.addParam('netInterfaces', params.EnumParam, choices=self.nifsNameList,
-                      default=1,#usually 0 is the loopback
+                      default=0,
                       label="Interface", condition='doNetwork',
                       help="See http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/Symmetry"
                            " for a description of the symmetry groups format in Xmipp.\n"
@@ -161,6 +167,7 @@ class ProtMonitorSystem(ProtMonitor):
                                    doNetwork=self.doNetwork.get(),
                                    doDiskIO=self.doDiskIO.get(),
                                    nif=self.nifsNameList[self.netInterfaces.get()],
+                                   nifs=self.nifsNameList,
                                    gpusToUse = self.gpusToUse.get(),
                                     )
         return sysMonitor
@@ -226,15 +233,22 @@ class MonitorSystem(Monitor):
         else:
             self.gpusToUse = None
         if self.doNetwork:
-            self.nif = kwargs['nif']
-            self.netLabelList=[] # in the future we may display all the network interfaces
-            self.netLabelList.append("%s_send"%self.nif)
-            self.netLabelList.append("%s_recv"%self.nif)
+            self.nif  = kwargs['nif']
+            self.nifs = kwargs['nifs']
+            self.netLabelList=[]
+
+            if self.nif == 'all':
+                self.nifs = self.nifs[:-1]#remove word "all"
+            else:
+                self.nifs = [self.nif]
+            for nif in self.nifs:#[:-1]:
+                self.netLabelList.append("%s_send"%nif)
+                self.netLabelList.append("%s_recv"%nif)
             self.labelList += self.netLabelList
         else:
             self.nif = None
         if self.doDiskIO:
-            self.netLabelList=[] # in the future we may display all the network interfaces
+            self.netLabelList=[] # in the future we may display all disks
             self.netLabelList.append("disk_read")
             self.netLabelList.append("disk_write")
             self.labelList += self.netLabelList
@@ -288,15 +302,17 @@ class MonitorSystem(Monitor):
         if self.doNetwork:
             try:
                 #measure a sort interval
-                pnic_before = psutil.net_io_counters(pernic=True)[self.nif]
+                pnic_before = psutil.net_io_counters(pernic=True)#[self.nif]
                 time.sleep(self.samplingTime)# sec
-                pnic_after = psutil.net_io_counters(pernic=True)[self.nif]
-                bytes_sent = pnic_after.bytes_sent - pnic_before.bytes_sent
-                bytes_recv = pnic_after.bytes_recv - pnic_before.bytes_recv
-                valuesDict["%s_send"%self.nif] = bytes_sent * self.samplingTime / 1048576
-                valuesDict["%s_recv"%self.nif] = bytes_recv * self.samplingTime / 1048576
+                pnic_after = psutil.net_io_counters(pernic=True)#[self.nif]
+                for nif in self.nifs:#[:-1]:
+                    print "nif", nif
+                    bytes_sent = pnic_after[nif].bytes_sent - pnic_before[nif].bytes_sent
+                    bytes_recv = pnic_after[nif].bytes_recv - pnic_before[nif].bytes_recv
+                    valuesDict["%s_send"%nif] = bytes_sent * self.samplingTime / 1048576
+                    valuesDict["%s_recv"%nif] = bytes_recv * self.samplingTime / 1048576
             except:
-                msg = "cannot get information of network interface %s"%self.nif
+                msg = "cannot get information of network interfaces %s"%self.nifs
 
         if self.doDiskIO:
             try:
