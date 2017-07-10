@@ -229,8 +229,13 @@ class MonitorSystem(Monitor):
                 self.gpuLabelList.append("gpuUse_%d"%i)
                 self.gpuLabelList.append("gpuTem_%d"%i)
             #init GPUs
-            nvmlInit()
-            self.labelList += self.gpuLabelList
+            try:
+                nvmlInit()
+                self.labelList += self.gpuLabelList
+            except:
+                self.gpusToUse = None
+                self.doGpu = False
+
         else:
             self.gpusToUse = None
         if self.doNetwork:
