@@ -229,8 +229,13 @@ class MonitorSystem(Monitor):
                 self.gpuLabelList.append("gpuUse_%d"%i)
                 self.gpuLabelList.append("gpuTem_%d"%i)
             #init GPUs
-            nvmlInit()
-            self.labelList += self.gpuLabelList
+            try:
+                nvmlInit()
+                self.labelList += self.gpuLabelList
+            except:
+                self.gpusToUse = None
+                self.doGpu = False
+
         else:
             self.gpusToUse = None
         if self.doNetwork:
@@ -441,9 +446,10 @@ class ProtMonitorSystemViewer(Viewer):
         Viewer.__init__(self, **args)
 
     def _visualize(self, obj, **kwargs):
+
         return [SystemMonitorPlotter(obj.createMonitor(),
                                      nifList=self.protocol.nifsNameList,
-                                     nifName=self.protocol.netInterfaces.get(),
+                                     nifIndex=self.protocol.netInterfaces.get(),
                                      tableName = self.protocol.tableName
                                      )
                 ]
@@ -454,7 +460,7 @@ class SystemMonitorPlotter(EmPlotter):
     _label = 'Monitor System'
     _targets = [ProtMonitorSystem]
 
-    def __init__(self, monitor, nifList, nifName=None, tableName="log"):
+    def __init__(self, monitor, nifList, nifIndex=0, tableName="log"):
         EmPlotter.__init__(self, windowTitle="Monitor: System")
         self.monitor = monitor
         self.y2 = 0.
@@ -473,21 +479,21 @@ class SystemMonitorPlotter(EmPlotter):
         self.init = True
         self.stop = False
 
-        self.nifName = nifName
+        self.nifName = nifList[nifIndex]
         if self.nifName == 'all':
-            self.nifList = self.nifList[:-1]  # remove word "all"
+            self.nifList = nifList[:-1]  # remove word "all"
         else:
-            self.nifList = [self.nifName]
+            self.nifList = []
+            self.nifList.append(self.nifName)
         self.tableName = tableName
+        #import pickle            
+        #f=open("/tmp/kkk","w")
+        #f.write("self.nifName: " + str(self.nifName) + "\n")
+        #pickle.dump(self.nifList, f )
+        #f.close()
 
 #    def validate(self):
-#        """check if we have collected at least two data points"""
-#        data = self.monitor.getData()
-#        x = data['idValues']
-#        if len(x) < 2:
-#            msg = "Cannot plot the data since less than 2 samples has been collected.\n Try again later"
-#            errorWindow(None, msg)
-
+#         pass
     def _getTitle(self):
         return ("Use scrool wheel to change view window (win=%d)\n "
                 "S stops, C continues plotting. Toggle ON/OFF GPU_X by pressing X\n"
@@ -544,6 +550,7 @@ class SystemMonitorPlotter(EmPlotter):
 
         def netKey(key):
             self.colorChanged=True
+
             for nifName in self.nifList:
                 if self.color['%s_send'%nifName] != 'w':
                     self.oldColor['%s_send'%nifName] = self.color['%s_send'%nifName]
@@ -566,6 +573,7 @@ class SystemMonitorPlotter(EmPlotter):
                 self.color['disk_write'] = self.oldColor['disk_write']
 
         sys.stdout.flush()
+
         if event.key == 'S':
             self.stop = True
             self.ax.set_title('Plot has been Stopped. Press C to continue plotting')
