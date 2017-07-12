@@ -73,6 +73,9 @@ while [ $SECONDS -lt $END ]; do
    fi
    echo rsync -r -P -t -l $FROMDIRECTORY $TARGET
    rsync -r -P -t -l  $FROMDIRECTORY $TARGET
+   #bbcp  -r -a -P 2 -s 3 $FROMDIRECTORY $TARGET 
+   #rsync -r -P -t -l $FROMDIRECTORY $TARGET 
+ 
    date
    printf "sleeping $SEC sec.\n"
    ETA=`expr $END - $SECONDS`
@@ -86,7 +89,12 @@ done
 #        --progress (show progress during transfer)
 #-t: preserve modification times
 #-l copy symlinks as symlinks
-
+#bbcp flags
+#
+# -s number of conections 
+# -P produce progress mensages each x seconds
+# -a appebd data at the end of partially transfered files
+@ -r perform a recursive copy
 # RECOMENDATIONS***********
 # 1) Do not use external disk formated with vfat since it cannot
 # handle symbolic links. Use some linux format as ext4 o xsf
