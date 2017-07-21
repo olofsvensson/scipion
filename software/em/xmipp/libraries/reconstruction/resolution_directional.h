@@ -52,10 +52,10 @@ class ProgResDir : public XmippProgram
 {
 public:
 	 /** Filenames */
-	FileName fnOut, fnVol, fnVol2, fnMask, fnchim, fnSpatial, fnSym, fnMeanVol, fnMaskOut, fnMd;
+	FileName fnOut, fnVol, fnVol2, fnMask, fnchim, fnSym, fnMeanVol, fnMaskOut, fnMaxVol, fnMinVol, fnMd;
 
 	/** sampling rate, minimum resolution, and maximum resolution */
-	double sampling, minRes, maxRes, R, ang_sampling, N_points;
+	double sampling, minRes, maxRes, R, ang_sampling, N_points, pepep;
 
 	/** Is the volume previously masked?*/
 	int NVoxelsOriginalMask, Nvoxels;
@@ -88,10 +88,9 @@ public:
     MultidimArray<double> iu, VRiesz; // Inverse of the frequency
 	MultidimArray< std::complex<double> > fftV, *fftN; // Fourier transform of the input volume
 	FourierTransformer transformer_inv;
-	MultidimArray< std::complex<double> > fftVRiesz;
+	MultidimArray< std::complex<double> > fftVRiesz, fftVRiesz_aux;
 	FourierFilter lowPassFilter, FilterBand;
 	bool halfMapsGiven;
-	Image<double> Vfiltered, VresolutionFiltered;
 	Sampling mysampling;
 	Matrix2D<double> angles;
 
