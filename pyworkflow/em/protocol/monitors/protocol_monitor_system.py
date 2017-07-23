@@ -603,8 +603,10 @@ class SystemMonitorPlotter(EmPlotter):
     def animate(self,i=0): #do NOT remove i
         if self.stop:
             return
-
         data = self.monitor.getData()
+        if not data:#no data is available in the database (protocol was
+                    #just started
+            return
         self.x = data['idValues']
         for k,v in self.lines.iteritems():
             self.y = data[k]
@@ -646,26 +648,19 @@ class SystemMonitorPlotter(EmPlotter):
             counter += 1
         self.lenPlots=len(self.color)
         #chek table exists.
-        retryTimeSec=5
         if self.monitor.checkTableExists(self.tableName):
             data = self.monitor.getData()
         else:
             data = False
-        error = True
-        while (not data) or \
+        if (not data) or \
               ('idValues' not in data or \
               (len(data['idValues'])< 2) \
             ):
             if self.monitor.checkTableExists(self.tableName):
                 data = self.monitor.getData()
-            if error:
-                msg = """Cannot plot the data since less than 2 samples has been collected.
-I will retry each %d seconds. Do not press Analyze Results again!"""%retryTimeSec
-                errorWindow(None, msg)
-                EmPlotter.show(self)#if show is not called the error window remains
-            time.sleep(5) # wait until the log table has been created
-                          # and data collected
-            error = False
+            msg = """Cannot plot the data since less than 2 samples has been collected.
+I will retry each %d seconds. Do not press Analyze Results again!"""%self.monitor.samplingInterval
+            errorWindow(None, msg)
 
         self.paint(self.monitor.getLabels())
 
