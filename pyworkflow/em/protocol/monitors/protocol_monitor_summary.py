@@ -200,6 +200,7 @@ class ProtMonitorSummary(ProtMonitor):
                                    doNetwork=self.doNetwork.get(),
                                    doDiskIO=self.doDiskIO.get(),
                                    nif=self.nifsNameList[self.netInterfaces.get()],
+                                   nifs=self.nifsNameList,
                                    )
 
         return sysMonitor
