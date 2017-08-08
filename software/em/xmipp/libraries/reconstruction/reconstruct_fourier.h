@@ -227,9 +227,9 @@ private:
     /** Method to allocate 3D array (not continuous) of given size */
     template<typename T>
     static T*** allocate(T***& where, int xSize, int ySize, int zSize);
-    /** Method to allocate 2D array (not continuous) of given size */
+    /** Method to release 3D array of given size */
     template<typename T>
-    static T** allocate(T**& where, int xSize, int ySize);
+    void release(T***& array, int ySize, int zSize);
     /** Method running on separate thread */
 	static void* loadImageThread(void* threadArgs);
 	/** Function behaving like an identity, i.e returning passed value */
@@ -281,6 +281,27 @@ private:
     static void computeAABB(Point3D* AABB, Point3D* cuboid,
     		float minX, float minY, float minZ,
     		float maxX, float maxY, float maxZ);
+    /** Returns true if x is in (min, max) interval */
+    template <typename T>
+    static bool inRange(T x, T min, T max) {
+    	return (x > min) && (x < max);
+    }
+    /** Returns X coordinate of the point [y, z] on the plane defined by p0 (origin) and two vectors */
+    static bool getX(float& x, float y, float z, const Point3D& a, const Point3D& b, const Point3D& p0);
+    /** Returns Y coordinate of the point [x, z] on the plane defined by p0 (origin) and two vectors */
+    static bool getY(float x, float& y, float z, const Point3D& a, const Point3D& b, const Point3D& p0);
+    /** Returns Z coordinate of the point [x, y] on the plane defined by p0 (origin) and two vectors */
+    static bool getZ(float x, float y, float& z, const Point3D& a, const Point3D& b, const Point3D& p0);
+    /** Method returns vectors defining the plane */
+    static void getVectors(const Point3D* plane, Point3D& u, Point3D& v);
+    /** DEBUG ONLY method, prints AABB to std::cout. Output can be used in e.g. GNUPLOT */
+    static void printAABB(Point3D* AABB);
+    /** Method will convert Matrix2D matrix to float[3][3] */
+    static void convert(Matrix2D<double>& in, float out[3][3]);
+    /** Method to convert temporal space to expected (original) format */
+    template<typename T, typename U>
+    static void convertToExpectedSpace(T*** input, int size,
+    	MultidimArray<U>& VoutFourier);
 
 // METHODS
 	/** Method will set indexes of the images to load and open sync barrier */
@@ -338,12 +359,13 @@ private:
     		int x, int y, int z,
 			const float transform[3][3], float maxDistanceSqr,
     		ProjectionData* const data);
-
-
+    /**
+     * Method will map one voxel from the temporal
+     * spaces to the given projection and update temporal spaces
+     * using the pixel values of the projection withing the blob distance.
+     */
     void processVoxelBlob(int x, int y, int z, const float transform[3][3], float maxDistanceSqr,
     		ProjectionData* const data);
-
-
     /**
      * Method sets wCTF and wModulator based on position
      * in the image
@@ -351,55 +373,6 @@ private:
     void processCTF(ProjectionData* const data,
     		int imgX, int imgY,
 			float& wCTF, float& wModulator);
-
-//    /**
-//     * Method will return a pixel on given position (rounded to closest int,
-//     * clamped to img size)
-//     */
-//    std::complex<float>
-//    getPixelClamped(Array2D<std::complex<float> >* img, float x, float y);
-    //    inline void allocateFourierWeights() {
-//    	if (NULL == FourierWeights.data) {
-//    		FourierWeights.initZeros(paddedImgSize, paddedImgSize, paddedImgSize/2 +1);
-//    	}
-//    }
-//
-//    void saveIntermediateFSC(std::complex<float>*** outputVolume, float*** outputWeight, int volSize,
-//    		const std::string &weightsFileName, const std::string &fourierFileName, const FileName &resultFileName,
-//			bool storeResult);
-//    void saveFinalFSC(std::complex<float>*** outputVolume, float*** outputWeight, int volSize);
-//
-//    template<typename T>
-//    void crop(T***& inOut, int size);
-//
-//	static void processCube(
-//			int i,
-//			int j,
-//			const Matrix1D<int>& corner1,
-//			const Matrix1D<int>& corner2,
-//			const MultidimArray<float>& z2precalculated,
-//			const MultidimArray<int>& zWrapped,
-//			const MultidimArray<int>& zNegWrapped,
-//			const MultidimArray<float>& y2precalculated,
-//			float blobRadiusSquared,
-//			const MultidimArray<int>& yWrapped,
-//			const MultidimArray<int>& yNegWrapped,
-//			const MultidimArray<float>& x2precalculated,
-//			float iDeltaSqrt,
-//			float wModulator,
-//			const MultidimArray<int>& xWrapped,
-//			int xsize_1,
-//			const MultidimArray<int>& xNegWrapped,
-//			bool reprocessFlag,
-//			float wCTF,
-//			MultidimArray<std::complex<double> >& VoutFourier,
-//			Matrix1D<double>& blobTableSqrt,
-//			LoadThreadParams* threadParams,
-//			MultidimArray<double>& fourierWeights,
-//			double* ptrIn,
-//			float weight,
-//			ProgRecFourier * parent,
-//			Matrix1D<double>& real_position);
 };
 //@}
 #endif
