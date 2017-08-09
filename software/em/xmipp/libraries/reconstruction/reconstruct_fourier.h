@@ -363,6 +363,10 @@ private:
     template<typename T, typename U>
     static void convertToExpectedSpace(T*** input, int size,
     	MultidimArray<U>& VoutFourier);
+    /** Method to load a buffer of images from input file */
+    static void preloadBuffer(LoadThreadParams * threadParams,
+    		ProgRecFourier* parent,
+    		bool hasCTF, std::vector<size_t>& objId);
 
 // METHODS
 

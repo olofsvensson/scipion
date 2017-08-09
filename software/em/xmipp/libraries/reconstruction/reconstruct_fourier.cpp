@@ -251,8 +251,12 @@ inline void ProgRecFourier::getVectors(const Point3D* plane, Point3D& u, Point3D
 	float x0 = plane[0].x;
 	float y0 = plane[0].y;
 	float z0 = plane[0].z;
-	u = { plane[1].x - x0, plane[1].y - y0, plane[1].z - z0 };
-	v = { plane[3].x - x0, plane[3].y - y0, plane[3].z - z0 };
+	u.x = plane[1].x - x0;
+	u.y = plane[1].y - y0;
+	u.z = plane[1].z - z0;
+	v.x = plane[3].x - x0;
+	v.y = plane[3].y - y0;
+	v.z = plane[3].z - z0;
 }
 
 Array2D<std::complex<float> >* ProgRecFourier::cropAndShift(MultidimArray<std::complex<double> >& paddedFourier,
@@ -285,24 +289,111 @@ Array2D<std::complex<float> >* ProgRecFourier::cropAndShift(MultidimArray<std::c
 	return result;
 }
 
+void ProgRecFourier::preloadBuffer(LoadThreadParams * threadParams,
+		ProgRecFourier * parent,
+		bool hasCTF, std::vector<size_t>& objId)
+{
+    ApplyGeoParams params;
+    MultidimArray<double> localPaddedImg;
+	FourierTransformer localTransformerImg;
+	MultidimArray< std::complex<double> > localPaddedFourier;
+    params.only_apply_shifts = true;
+	if (NULL == threadParams->buffer1) {
+		threadParams->buffer1 = new ProjectionData[parent->bufferSize];
+	}
+	for (int bIndex = 0; bIndex < parent->bufferSize; bIndex++) {
+		double rot, tilt, psi, weight;
+		Projection proj;
+		Matrix2D<double> localA(3, 3);
+		int imgIndex = threadParams->startImageIndex + bIndex;
+		ProjectionData* data = &threadParams->buffer1[bIndex];
+		if (imgIndex >= threadParams->endImageIndex) {
+			data->skip = true;
+			continue;
+		}
+		//Read projection from selfile, read also angles and shifts if present
+		//but only apply shifts
+		proj.readApplyGeo(*(threadParams->selFile), objId[imgIndex], params);
+		rot = proj.rot();
+		tilt = proj.tilt();
+		psi = proj.psi();
+		if (parent->do_weights && proj.weight() == 0.f) {
+			data->skip = true;
+			continue;
+		}
+		data->weight = (parent->do_weights) ? proj.weight() : 1.0;
+		if (hasCTF) {
+			data->ctf.enable_CTF = true;
+			data->ctf.enable_CTFnoise = false;
+			data->ctf.readFromMetadataRow(*(threadParams->selFile),
+					objId[imgIndex]);
+			data->ctf.produceSideInfo();
+		} else {
+			data->ctf.enable_CTF = false;
+		}
+		// Copy the projection to the center of the padded image
+		// and compute its Fourier transform
+		proj().setXmippOrigin();
+		localPaddedImg.initZeros(parent->paddedImgSize, parent->paddedImgSize);
+		localPaddedImg.setXmippOrigin();
+		const MultidimArray<double> &mProj = proj();
+		FOR_ALL_ELEMENTS_IN_ARRAY2D(mProj)
+			A2D_ELEM(localPaddedImg,i,j) = A2D_ELEM(mProj, i, j);
+		CenterFFT(localPaddedImg, true);
+
+		// Fourier transformer for the images
+		localTransformerImg.setReal(localPaddedImg);
+		localTransformerImg.FourierTransform();
+		localTransformerImg.getFourierAlias(localPaddedFourier);
+
+		// Compute the coordinate axes associated to this image
+		Euler_angles2matrix(rot, tilt, psi, localA);
+
+		data->localAInv = localA.transpose();
+		data->img = cropAndShift(localPaddedFourier, parent);
+		data->imgIndex = imgIndex;
+		data->skip = false;
+		//#define DEBUG22
+#ifdef DEBUG22
+                //CORRECTO
+
+			if(threadParams->myThreadID%1==0)
+			{
+				proj.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
+ integerToString(threadParams->imageIndex) + "proj.spi");
+
+				ImageXmipp save44;
+				save44()=localPaddedImg;
+				save44.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
+ integerToString(threadParams->imageIndex) + "local_padded_img.spi");
+
+				FourierImage save33;
+				save33()=localPaddedFourier;
+				save33.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
+ integerToString(threadParams->imageIndex) + "local_padded_fourier.spi");
+				FourierImage save22;
+				//save22()=*paddedFourier;
+				save22().alias(*(threadParams->localPaddedFourier));
+				save22.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
+ integerToString(threadParams->imageIndex) + "_padded_fourier.spi");
+			}
+
+#endif
+#undef DEBUG22
+	}
+}
+
 void * ProgRecFourier::loadImageThread( void * threadArgs )
 {
-
     LoadThreadParams * threadParams = (LoadThreadParams *) threadArgs;
     ProgRecFourier * parent = threadParams->parent;
     barrier_t * barrier = &(parent->barrier);
 
-    MultidimArray< std::complex<double> > localPaddedFourier;
-    MultidimArray<double> localPaddedImg;
-    FourierTransformer localTransformerImg;
     std::vector<size_t> objId;
-
     threadParams->selFile->findObjects(objId);
-    ApplyGeoParams params;
-    params.only_apply_shifts = true;
-
-    bool hasCTF=(threadParams->selFile->containsLabel(MDL_CTF_MODEL) || threadParams->selFile->containsLabel(MDL_CTF_DEFOCUSU)) &&
-                parent->useCTF;
+    bool hasCTF = parent->useCTF
+    		&& (threadParams->selFile->containsLabel(MDL_CTF_MODEL)
+    				|| threadParams->selFile->containsLabel(MDL_CTF_DEFOCUSU));
     do
     {
         barrier_wait( barrier );
@@ -311,90 +402,7 @@ void * ProgRecFourier::loadImageThread( void * threadArgs )
         {
         case PRELOAD_IMAGE:
             {
-            	if (NULL == threadParams->buffer1) {
-            		threadParams->buffer1 = new ProjectionData[parent->bufferSize];
-            	}
-                for(int bIndex = 0; bIndex < parent->bufferSize; bIndex++) {
-                    double rot, tilt, psi, weight;
-                    Projection proj;
-                	Matrix2D<double>  localA(3, 3);
-                	int imgIndex = threadParams->startImageIndex + bIndex;
-                	ProjectionData* data = &threadParams->buffer1[bIndex];
-                	if (imgIndex >= threadParams->endImageIndex ) {
-                		data->skip = true;
-                		continue;
-                	}
-                    //Read projection from selfile, read also angles and shifts if present
-                    //but only apply shifts
-                    proj.readApplyGeo(*(threadParams->selFile), objId[imgIndex], params);
-                    rot  = proj.rot();
-                    tilt = proj.tilt();
-                    psi  = proj.psi();
-                    if (parent->do_weights && proj.weight() == 0.f) {
-                    	data->skip = true;
-						continue;
-					}
-                    data->weight = (parent->do_weights) ? proj.weight() : 1.0;
-                    if (hasCTF)
-                    {
-                        data->ctf.enable_CTF=true;
-                        data->ctf.enable_CTFnoise=false;
-                    	data->ctf.readFromMetadataRow(*(threadParams->selFile),objId[imgIndex]);
-                    	data->ctf.produceSideInfo();
-                    } else {
-                    	data->ctf.enable_CTF=false;
-                    }
-                    // Copy the projection to the center of the padded image
-                    // and compute its Fourier transform
-                    proj().setXmippOrigin();
-					localPaddedImg.initZeros(parent->paddedImgSize, parent->paddedImgSize);
-					localPaddedImg.setXmippOrigin();
-					const MultidimArray<double> &mProj=proj();
-					FOR_ALL_ELEMENTS_IN_ARRAY2D(mProj)
-					A2D_ELEM(localPaddedImg,i,j)=A2D_ELEM(mProj,i,j);
-					CenterFFT(localPaddedImg,true);
-
-					// Fourier transformer for the images
-					localTransformerImg.setReal(localPaddedImg);
-					localTransformerImg.FourierTransform();
-					localTransformerImg.getFourierAlias(localPaddedFourier);
-
-                    // Compute the coordinate axes associated to this image
-                    Euler_angles2matrix(rot, tilt, psi, localA);
-
-                    data->localAInv = localA.transpose();
-                    data->img = cropAndShift(localPaddedFourier, parent);
-                    data->imgIndex = imgIndex;
-                    data->skip = false;
-                    //#define DEBUG22
-#ifdef DEBUG22
-				{                    //CORRECTO
-
-					if(threadParams->myThreadID%1==0)
-					{
-						proj.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
-								integerToString(threadParams->imageIndex) + "proj.spi");
-
-						ImageXmipp save44;
-						save44()=localPaddedImg;
-						save44.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
-								integerToString(threadParams->imageIndex) + "local_padded_img.spi");
-
-						FourierImage save33;
-						save33()=localPaddedFourier;
-						save33.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
-								integerToString(threadParams->imageIndex) + "local_padded_fourier.spi");
-						FourierImage save22;
-						//save22()=*paddedFourier;
-						save22().alias(*(threadParams->localPaddedFourier));
-						save22.write((std::string) integerToString(threadParams->myThreadID) + "_" +\
-								integerToString(threadParams->imageIndex) + "_padded_fourier.spi");
-					}
-
-				}
-#endif
-                    #undef DEBUG22
-                }
+            	preloadBuffer(threadParams, parent, hasCTF, objId);
                 break;
             }
         case EXIT_THREAD:
@@ -405,7 +413,7 @@ void * ProgRecFourier::loadImageThread( void * threadArgs )
 
         barrier_wait( barrier );
     }
-    while ( 1 );
+    while ( true );
 }
 
 template<typename T, typename U>
