@@ -67,8 +67,8 @@ void ProgRecFourier::defineParams()
     addParamsLine("  [--minCTF <ctf=0.01>]          : Minimum value of the CTF that will be inverted");
     addParamsLine("                                 : CTF values (in absolute value) below this one will not be corrected");
     addParamsLine("  [--bufferSize <size=25>]        : Number of projection loaded in memory (will be actually 2x as much.");
-    addParamsLine("                                 : This will require up to 2*size*projSize*projSize*16B, e.g.");
-    addParamsLine("                                 : 50MB for projection of 256x256 or 200MB for projection of 512x512");
+    addParamsLine("                                 : This will require up to 4*size*projSize*projSize*16B, e.g.");
+    addParamsLine("                                 : 100MB for projection of 256x256 or 400MB for projection of 512x512");
     addExampleLine("For reconstruct enforcing i3 symmetry and using stored weights:", false);
     addExampleLine("   xmipp_reconstruct_fourier  -i reconstruction.sel --sym i3 --weight");
 }
@@ -289,8 +289,8 @@ Array2D<std::complex<float> >* ProgRecFourier::cropAndShift(MultidimArray<std::c
 	return result;
 }
 
-void ProgRecFourier::preloadBuffer(LoadThreadParams * threadParams,
-		ProgRecFourier * parent,
+void ProgRecFourier::preloadBuffer(LoadThreadParams* threadParams,
+		ProgRecFourier* parent,
 		bool hasCTF, std::vector<size_t>& objId)
 {
     ApplyGeoParams params;
@@ -298,7 +298,7 @@ void ProgRecFourier::preloadBuffer(LoadThreadParams * threadParams,
 	FourierTransformer localTransformerImg;
 	MultidimArray< std::complex<double> > localPaddedFourier;
     params.only_apply_shifts = true;
-	if (NULL == threadParams->buffer1) {
+	if (0 == threadParams->buffer1) {
 		threadParams->buffer1 = new ProjectionData[parent->bufferSize];
 	}
 	for (int bIndex = 0; bIndex < parent->bufferSize; bIndex++) {
@@ -308,7 +308,6 @@ void ProgRecFourier::preloadBuffer(LoadThreadParams * threadParams,
 		int imgIndex = threadParams->startImageIndex + bIndex;
 		ProjectionData* data = &threadParams->buffer1[bIndex];
 		if (imgIndex >= threadParams->endImageIndex) {
-			data->skip = true;
 			continue;
 		}
 		//Read projection from selfile, read also angles and shifts if present
@@ -318,19 +317,10 @@ void ProgRecFourier::preloadBuffer(LoadThreadParams * threadParams,
 		tilt = proj.tilt();
 		psi = proj.psi();
 		if (parent->do_weights && proj.weight() == 0.f) {
-			data->skip = true;
 			continue;
 		}
 		data->weight = (parent->do_weights) ? proj.weight() : 1.0;
-		if (hasCTF) {
-			data->ctf.enable_CTF = true;
-			data->ctf.enable_CTFnoise = false;
-			data->ctf.readFromMetadataRow(*(threadParams->selFile),
-					objId[imgIndex]);
-			data->ctf.produceSideInfo();
-		} else {
-			data->ctf.enable_CTF = false;
-		}
+
 		// Copy the projection to the center of the padded image
 		// and compute its Fourier transform
 		proj().setXmippOrigin();
@@ -352,6 +342,12 @@ void ProgRecFourier::preloadBuffer(LoadThreadParams * threadParams,
 		data->localAInv = localA.transpose();
 		data->img = cropAndShift(localPaddedFourier, parent);
 		data->imgIndex = imgIndex;
+		if (hasCTF) {
+			Array2D<float>* CTF = new Array2D<float>(data->img->getXSize(), data->img->getYSize());
+			Array2D<float>* modulator = new Array2D<float>(data->img->getXSize(), data->img->getYSize());
+			preloadCTF(threadParams, objId[imgIndex],parent, CTF, modulator);
+		}
+		// set data as usable
 		data->skip = false;
 		//#define DEBUG22
 #ifdef DEBUG22
@@ -541,32 +537,50 @@ void ProgRecFourier::printAABB(Point3D* AABB) {
 		<< std::endl;
 }
 
-inline void ProgRecFourier::processCTF(ProjectionData* const data,
-		int imgX, int imgY, float& wCTF, float& wModulator)
+inline void ProgRecFourier::preloadCTF(LoadThreadParams* threadParams,
+		size_t imgIndex,
+		ProgRecFourier* parent,
+		Array2D<float>* CTF,
+		Array2D<float>* modulator)
 {
+	CTFDescription ctf;
+	ctf.readFromMetadataRow(*(threadParams->selFile), imgIndex);
+	ctf.produceSideInfo();
 	float freqX, freqY;
-	// get respective frequency
-	FFT_IDX2DIGFREQ(imgX, paddedImgSize, freqX);
-	// since Y axis is shifted to center, we have to use different calculation
-	freqY = (imgY - (paddedImgSize / 2.f)) / (float) paddedImgSize;
-	data->ctf.precomputeValues(freqX * iTs, freqY * iTs);
-	wCTF = data->ctf.getValuePureNoKAt();
-	if (std::isnan(wCTF)) {
-		if ((imgX == 0) && (imgY == 0)) {
-			wModulator = wCTF = 1.0;
-		}
-		else {
-			wModulator = wCTF = 0.0;
+	float CTFVal, modulatorVal;
+	for (int y = 0; y < CTF->getYSize(); y++) {
+		// since Y axis is shifted to center, we have to use different calculation
+		freqY = (y - (parent->paddedImgSize / 2.f)) / (float) parent->paddedImgSize;
+		for (int x = 0; x < CTF->getXSize(); x++) {
+			CTFVal = modulatorVal = 1.f;
+			// get respective frequency
+			FFT_IDX2DIGFREQ(x, parent->paddedImgSize, freqX);
+			ctf.precomputeValues(freqX * parent->iTs, freqY * parent->iTs);
+			CTFVal = ctf.getValuePureNoKAt();
+			if (std::isnan(CTFVal)) {
+				if ((x == 0) && (y == 0)) {
+					modulatorVal = CTFVal = 1.0;
+				}
+				else {
+					modulatorVal = CTFVal = 0.0;
+				}
+			}
+			if (fabs(CTFVal) < parent->minCTF) {
+				modulatorVal = fabs(CTFVal);
+				CTFVal = SGN(CTFVal);
+			} else {
+				CTFVal = 1.0 / CTFVal;
+			}
+			if (parent->isPhaseFlipped)
+				CTFVal = fabs(CTFVal);
+
+			(*CTF)(x, y) = CTFVal;
+			(*modulator)(x, y) = modulatorVal;
 		}
 	}
-	if (fabs(wCTF) < minCTF) {
-		wModulator = fabs(wCTF);
-		wCTF = SGN(wCTF);
-	} else {
-		wCTF = 1.0 / wCTF;
-	}
-	if (isPhaseFlipped)
-		wCTF = fabs(wCTF);
+
+
+
 }
 
 
@@ -591,8 +605,9 @@ inline void ProgRecFourier::processVoxel(int x, int y, int z, const float transf
 	int imgX = clamp((int)(imgPos.x + 0.5f), 0, data->img->getXSize() - 1);
 	int imgY = clamp((int)(imgPos.y + 0.5f + maxVolumeIndexYZ / 2), 0, data->img->getYSize() - 1);
 
-	if (data->ctf.enable_CTF) {
-		processCTF(data, imgX, imgY, wCTF, wModulator);
+	if (0 != data->CTF) {
+		wCTF = (*data->CTF)(imgX, imgY);
+		wModulator = (*data->modulator)(imgX, imgY);
 	}
 
 	float weight = wBlob * wModulator * data->weight;
@@ -982,8 +997,7 @@ void ProgRecFourier::processBuffer(ProjectionData* buffer)
 			processProjection(//tempVolume, tempWeights, size,
 					projData, transf, transfInv);
 		}
-		delete projData->img;
-		projData->img = 0;
+		projData->clean();
 	}
 }
 

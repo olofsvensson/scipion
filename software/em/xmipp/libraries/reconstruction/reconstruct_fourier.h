@@ -65,11 +65,29 @@ class ProgRecFourier;
 struct ProjectionData
 {
 	Array2D<std::complex<float> >* img;
-	CTFDescription ctf;
+	Array2D<float>* CTF;
+	Array2D<float>* modulator;
 	int imgIndex;
 	float weight;
 	Matrix2D<double> localAInv;
 	bool skip;
+public:
+	ProjectionData() {
+		img = 0;
+		CTF = modulator = 0;
+		skip = true;
+		weight = 0;
+		imgIndex = -1;
+	}
+	/** Remove stored data and set to skip */
+	void clean() {
+		delete img;
+		delete CTF;
+		delete modulator;
+		img = 0;
+		CTF = modulator = 0;
+		skip = true;
+	}
 };
 
 /** Struct represents a point in 3D */
@@ -367,6 +385,14 @@ private:
     static void preloadBuffer(LoadThreadParams * threadParams,
     		ProgRecFourier* parent,
     		bool hasCTF, std::vector<size_t>& objId);
+    /**
+     * Method computes CTF and weight modulator for each pixel in the image
+     */
+    static void preloadCTF(LoadThreadParams* threadParams,
+    		size_t imgIndex,
+			ProgRecFourier* parent,
+    		Array2D<float>* CTF,
+    		Array2D<float>* modulator);
 
 // METHODS
 
@@ -441,13 +467,7 @@ private:
     void processVoxelBlob(int x, int y, int z, const float transform[3][3], float maxDistanceSqr,
     		ProjectionData* const data);
 
-    /**
-     * Method sets wCTF and wModulator based on position
-     * in the image
-     */
-    void processCTF(ProjectionData* const data,
-    		int imgX, int imgY,
-			float& wCTF, float& wModulator);
+
 };
 //@}
 #endif
