@@ -243,14 +243,11 @@ private:
     /** Volume padding Factor */
     double padding_factor_vol;
 
-    /** Sampling rate in Angstroms/pixel */
-    double sampling_rate;
-
     /** Max resolution in Angstroms */
-    double maxResolution;
+    float maxResolution;
 
     /** Maximum interesting resolution squared */
-    double maxResolutionSqr;
+    float maxResolutionSqr;
 
     /** Tells the loading thread what to do next */
     int threadOpCode;
@@ -262,10 +259,10 @@ private:
     Matrix1D<double>  Fourier_blob_table;
 
     /** Table with blob values, squared sampling */
-    Matrix1D<double> blobTableSqrt;
+    float blobTableSqrt[BLOB_TABLE_SIZE_SQRT];
 
     /** Inverse of the delta and deltaFourier used in the tables */
-    double iDeltaFourier, iDeltaSqrt;
+    float iDeltaFourier, iDeltaSqrt;
 
     /** Definition of the blob */
     struct blobtype blob;
@@ -428,7 +425,7 @@ private:
      */
     template<typename T>
     T*** applyBlob(T***& input, float blobSize,
-    		Matrix1D<double>& blobTableSqrt, float iDeltaSqrt);
+    		float* blobTableSqrt, float iDeltaSqrt);
 
     /**
      * Method will allocate space for output Fourier transformation.

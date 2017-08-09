@@ -189,7 +189,6 @@ void ProgRecFourier::produceSideinfo()
 	maxVolumeIndexX = maxVolumeIndexYZ = 2 * conserveRows;
 
     // Build a table of blob values
-    blobTableSqrt.resize(BLOB_TABLE_SIZE_SQRT);
     Fourier_blob_table.resize(BLOB_TABLE_SIZE_SQRT);
 
     struct blobtype blobFourier,blobnormalized;
@@ -205,11 +204,11 @@ void ProgRecFourier::produceSideinfo()
     double padXdim3 = padding_factor_vol * Xdim;
     padXdim3 = padXdim3 * padXdim3 * padXdim3;
     double blobTableSize = blob.radius*sqrt(1./ (BLOB_TABLE_SIZE_SQRT-1));
-    FOR_ALL_ELEMENTS_IN_MATRIX1D(blobTableSqrt)
+    for (int i = 0; i < BLOB_TABLE_SIZE_SQRT; i++)
     {
         //use a r*r sample instead of r
         //DIRECT_VEC_ELEM(blob_table,i)         = blob_val(delta*i, blob)  *iw0;
-        VEC_ELEM(blobTableSqrt,i)    = blob_val(blobTableSize*sqrt((double)i), blob)  *iw0;
+        blobTableSqrt[i] = blob_val(blobTableSize*sqrt((double)i), blob)  *iw0;
         //***
         //DIRECT_VEC_ELEM(fourierBlobTableSqrt,i) =
         //     blob_Fourier_val(fourierBlobTableSize*sqrt(i), blobFourier)*padXdim3  *iw0;
@@ -647,29 +646,48 @@ inline void ProgRecFourier::processVoxelBlob(int x, int y, int z, const float tr
 	maxY = std::min(maxY, data->img->getYSize()-1);
 	std::complex<float>* targetVolume = &tempVolume[z][y][x];
 	float* targetWeight = &tempWeights[z][y][x];
-	// check which pixel in the vicinity should contribute
-	for (int i = minY; i <= maxY; i++) {
-		float ySqr = (imgPos.y - i) * (imgPos.y - i);
-		float yzSqr = ySqr + zSqr;
-		if (yzSqr > radiusSqr) continue;
-		for (int j = minX; j <= maxX; j++) {
-			float xD = imgPos.x - j;
-			float distanceSqr = xD*xD + yzSqr;
-			if (distanceSqr > radiusSqr) continue;
+	// ugly spaghetti code, but improves performance by app. 10%
+	if (0 != data->CTF) {
+		// check which pixel in the vicinity that should contribute
+		for (int i = minY; i <= maxY; i++) {
+			float ySqr = (imgPos.y - i) * (imgPos.y - i);
+			float yzSqr = ySqr + zSqr;
+			if (yzSqr > radiusSqr) continue;
+			for (int j = minX; j <= maxX; j++) {
+				float xD = imgPos.x - j;
+				float distanceSqr = xD*xD + yzSqr;
+				if (distanceSqr > radiusSqr) continue;
 
-			float wCTF = 1.f;
-			float wModulator = 1.f;
-			int aux = (int) ((distanceSqr * iDeltaSqrt + 0.5)); //Same as ROUND but avoid comparison
-			float wBlob = blobTableSqrt[aux];
-
-			if (data->ctf.enable_CTF) {
-				processCTF(data, j, i, wCTF, wModulator);
+				float wCTF = (*data->CTF)(j, i);
+				float wModulator = (*data->modulator)(j, i);
+				int aux = (int) ((distanceSqr * iDeltaSqrt + 0.5)); //Same as ROUND but avoid comparison
+				float wBlob = blobTableSqrt[aux];
+				float weight = wBlob * wModulator * data->weight;
+				*targetWeight += weight;
+				*targetVolume += (*data->img)(j, i) * weight * wCTF;
 			}
-			float weight = wBlob * wModulator * data->weight;
-			*targetWeight += weight;
-			*targetVolume += (*data->img)(j, i) * weight * wCTF;
+		}
+	} else {
+		// check which pixel in the vicinity that should contribute
+		for (int i = minY; i <= maxY; i++) {
+			float ySqr = (imgPos.y - i) * (imgPos.y - i);
+			float yzSqr = ySqr + zSqr;
+			if (yzSqr > radiusSqr) continue;
+			for (int j = minX; j <= maxX; j++) {
+				float xD = imgPos.x - j;
+				float distanceSqr = xD*xD + yzSqr;
+				if (distanceSqr > radiusSqr) continue;
+
+				int aux = (int) ((distanceSqr * iDeltaSqrt + 0.5)); //Same as ROUND but avoid comparison
+				float wBlob = blobTableSqrt[aux];
+
+				float weight = wBlob * data->weight;
+				*targetWeight += weight;
+				*targetVolume += (*data->img)(j, i) * weight;
+			}
 		}
 	}
+
 }
 
 inline void ProgRecFourier::convert(Matrix2D<double>& in, float out[3][3]) {
@@ -821,7 +839,7 @@ void ProgRecFourier::release(T***& array, int ySize, int zSize) {
 
 template<typename T>
 T*** ProgRecFourier::applyBlob(T***& input, float blobSize,
-		Matrix1D<double>& blobTableSqrt, float iDeltaSqrt) {
+		float* blobTableSqrt, float iDeltaSqrt) {
 	float blobSizeSqr = blobSize * blobSize;
 	int blob = floor(blobSize); // we are using integer coordinates, so we cannot hit anything further
 	T tmp;
