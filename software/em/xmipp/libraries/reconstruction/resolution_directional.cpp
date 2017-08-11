@@ -49,6 +49,7 @@ void ProgResDir::readParams()
 	maxRes = getDoubleParam("--maxRes");
 	fnMaxVol = getParam("--maxVol");
 	fnMinVol = getParam("--minVol");
+	fnVar = getParam("--varVol");
 	fnSym = getParam("--sym");
 	N_freq = getDoubleParam("--number_frequencies");
 	noiseOnlyInHalves = checkParam("--noiseonlyinhalves");
@@ -80,7 +81,8 @@ void ProgResDir::defineParams()
 	addParamsLine("  [--minRes <s=30>]            : Minimum resolution (A)");
 	addParamsLine("  [--maxRes <s=1>]             : Maximum resolution (A)");
 	addParamsLine("  [--maxVol <vol_file=\"\">]   : Output filename with maximum resolution volume");
-	addParamsLine("  [--minVol <vol_file=\"\">]   : Output filename with maximum resolution volume");
+	addParamsLine("  [--minVol <vol_file=\"\">]   : Output filename with minimum resolution volume");
+	addParamsLine("  [--varVol <vol_file=\"\">]   : Output filename with varianze resolution volume");
 	addParamsLine("  [--noiseonlyinhalves]        : The noise estimation is only performed inside the mask");
 	addParamsLine("  [--significance <s=0.95>]    : The level of confidence for the hypothesis test.");
 	addParamsLine("  [--md_resdir <file=\".\">]   : Metadata with mean resolution by direction.");
@@ -209,21 +211,23 @@ void ProgResDir::produceSideInfo()
 	}
 
 	//use the mask for preparing resolution volumes
-	Image<double> MaxResolution, MinResolution, AvgResoltion;
+	Image<double> MaxResolution, MinResolution, AvgResoltion, VarianzeResolution;
 	MaxResolution().resizeNoCopy(inputVol);
 	MinResolution().resizeNoCopy(inputVol);
 	AvgResoltion().resizeNoCopy(inputVol);
+	VarianzeResolution().resizeNoCopy(inputVol);
 	MinResolution().initConstant(maxRes);
 	MaxResolution().initConstant(1);
 	AvgResoltion().initZeros();
+	VarianzeResolution().initZeros();
 
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(MaxResolution())
 		DIRECT_MULTIDIM_ELEM(MaxResolution(),n)*=DIRECT_MULTIDIM_ELEM(pMask,n);
 
-
 	MaxResolution.write(fnMaxVol);
 	MinResolution.write(fnMinVol);
 	AvgResoltion.write(fnOut);
+	VarianzeResolution.write(fnVar);
 
 	MaxResolution.clear();
 	MinResolution.clear();
@@ -289,7 +293,7 @@ void ProgResDir::generateGrid(const double N_points, Matrix2D<double> &angles)
 	for (size_t k=1 ; k<N_points+1; k++)
 	{
 		h = -1 + 2*(k-1)/(N_points-1);
-		MAT_ELEM(angles, 1, k-1) = acos(h);
+		MAT_ELEM(angles, 1, k-1) = acos(h)-PI/2;
 		if (abs(h) != 1)
 		{
 			if (k == 1)
@@ -301,7 +305,16 @@ void ProgResDir::generateGrid(const double N_points, Matrix2D<double> &angles)
 		{
 			MAT_ELEM(angles, 0, k-1) = 0;
 		}
+		std::cout << "rot = " << MAT_ELEM(angles, 0, k-1)*180/PI << "   tilt = " << MAT_ELEM(angles, 1, k-1)*180/PI << std::endl;
 	}
+
+//	MAT_ELEM(angles, 0, 0) = 0;
+//	MAT_ELEM(angles, 1, 0) = PI/2;
+//	MAT_ELEM(angles, 0, 1) = PI/2;
+//	MAT_ELEM(angles, 1, 1) = PI/2;
+
+
+
 }
 
 void ProgResDir::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> > &myfftV,
@@ -327,12 +340,12 @@ void ProgResDir::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> 
 
 	bool tilt_extreme=false, rot_extreme = false;
 
-	if (tilt_cone_plus>=PI)
+	if (tilt_cone_plus>=PI/2)
 	{
 		tilt_cone_plus = tilt_cone_plus - PI;
 		tilt_extreme = true;
 	}
-	if (tilt_cone_minus<=0)
+	if (tilt_cone_minus<=-PI/2)
 	{
 		tilt_cone_minus = tilt_cone_minus + PI;
 		tilt_extreme = true;
@@ -375,7 +388,7 @@ void ProgResDir::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> 
 
 						double iun=DIRECT_MULTIDIM_ELEM(iu,n);
 						//double tilt_freq = acos(uz/sqrt(ux*ux + uy*uy + uz*uz));
-						double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz)+PI/2;
+						double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz);
 						double rot_freq = acos(uy/sqrt(ux*ux + uy*uy));
 //						if (rot_freq<0)
 //							rot_freq = rot_freq + PI;
@@ -422,7 +435,7 @@ void ProgResDir::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> 
 
 					double iun=DIRECT_MULTIDIM_ELEM(iu,n);
 					//double tilt_freq = acos(uz/sqrt(ux*ux + uy*uy + uz*uz));
-					double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz)+PI/2;
+					double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz);
 					double rot_freq = acos(uy/sqrt(ux*ux + uy*uy));
 					if (rot_freq<0)
 						rot_freq = rot_freq + PI;
@@ -469,7 +482,7 @@ void ProgResDir::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> 
 
 					double iun=DIRECT_MULTIDIM_ELEM(iu,n);
 					//double tilt_freq = acos(uz/sqrt(ux*ux + uy*uy + uz*uz));
-					double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz)+PI/2;
+					double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz);
 					double rot_freq = acos(uy/sqrt(ux*ux + uy*uy));
 					if (rot_freq<0)
 						rot_freq = rot_freq + PI;
@@ -521,7 +534,7 @@ void ProgResDir::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> 
 
 					double iun=DIRECT_MULTIDIM_ELEM(iu,n);
 					//double tilt_freq = acos(uz/sqrt(ux*ux + uy*uy + uz*uz));
-					double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz)+PI/2;
+					double tilt_freq = atan(sqrt(ux*ux + uy*uy)/uz);
 					double rot_freq = acos(uy/sqrt(ux*ux + uy*uy));
 
 					if ( (((tilt_freq<tilt_cone_plus) && (tilt_freq>=0)) || ((tilt_freq>tilt_cone_minus) && (tilt_freq<=PI)) ) &&
@@ -705,9 +718,16 @@ void ProgResDir::postProcessingLocalResolutions(MultidimArray<double> &resolutio
 	{
 		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n) < last_res)
 		{
-			//DIRECT_MULTIDIM_ELEM(resolutionChimera, n) = filling_value;
-			DIRECT_MULTIDIM_ELEM(resolutionVol, n) = 0;
-			DIRECT_MULTIDIM_ELEM(pMask,n) = 0;
+			if (DIRECT_MULTIDIM_ELEM(pMask, n) >=1)
+			{
+				DIRECT_MULTIDIM_ELEM(resolutionVol, n) = filling_value;
+			}
+			else
+			{
+				DIRECT_MULTIDIM_ELEM(resolutionVol, n) = 0;
+				DIRECT_MULTIDIM_ELEM(pMask,n) = 0;
+			}
+
 		}
 		if (DIRECT_MULTIDIM_ELEM(resolutionVol, n) > trimming_value)
 		{
@@ -716,9 +736,9 @@ void ProgResDir::postProcessingLocalResolutions(MultidimArray<double> &resolutio
 		}
 	}
 	//#ifdef DEBUG_MASK
-	Image<int> imgMask;
-	imgMask = pMask;
-	imgMask.write(fnMaskOut);
+//	Image<int> imgMask;
+//	imgMask = pMask;
+//	imgMask.write(fnMaskOut);
 	//#endif
 }
 
@@ -743,7 +763,7 @@ void ProgResDir::run()
 	{
 		Image<double> outputResolution;
 		outputResolution().resizeNoCopy(VRiesz);
-		outputResolution().initConstant(maxRes);
+		outputResolution().initZeros();
 		MultidimArray<double> &pOutputResolution = outputResolution();
 		MultidimArray<double> amplitudeMS, amplitudeMN;
 		MultidimArray<int> mask_aux = mask();
@@ -766,7 +786,8 @@ void ProgResDir::run()
 		std::cout << "Analyzing frequencies in direction = " << dir << "   rot = " << rot*180/PI << "   tilt = " << tilt*180/PI << std::endl;
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) *= (double) DIRECT_MULTIDIM_ELEM(pMask, n);
+			if (DIRECT_MULTIDIM_ELEM(pMask, n) == 1)
+				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = maxRes;
 
 		std::vector<double> noiseValues;
 		FileName fnDebug;
@@ -962,10 +983,6 @@ void ProgResDir::run()
 				{
 					criticalW = freq;
 					std::cout << "Search stopped due to z>Z (hypothesis test)" << std::endl;
-					std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
-					std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
-					std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
-					std::cout << "  z= " << z << " (" << criticalZ << ")" << std::endl;
 					doNextIteration=false;
 				}
 				if (doNextIteration)
@@ -1035,33 +1052,49 @@ void ProgResDir::run()
 //		outputResolutionImage() = resolutionChimera;
 //		outputResolutionImage.write(fnchim);
 
-		Image<double> VarianzeResolution, MaxResolution, MinResolution, AvgResolution, dirResVol;
+		Image<double> VarianzeResolution, MaxResolution, MinResolution, AvgResolution;
 
-		dirResVol = pOutputResolution;
 		FileName fn_dires;
 		fn_dires = formatString("resolution_direcion_%i.vol", dir);
-		dirResVol.write(fn_dires);
+		//dirResVol.write(fn_dires);
 
+		//They were initialized in producesideinfo()
 		MaxResolution.read(fnMaxVol);
 		MinResolution.read(fnMinVol);
 		AvgResolution.read(fnOut);
+		VarianzeResolution.read(fnVar);
 
 		MultidimArray<double> &pMaxResolution = MaxResolution();
 		MultidimArray<double> &pMinResolution = MinResolution();
 		MultidimArray<double> &pAvgResolution = AvgResolution();
+		MultidimArray<double> &pVarianzeResolution = VarianzeResolution();
 
+		// Calculating min and max resolution volumes
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
 		{
-			DIRECT_MULTIDIM_ELEM(pAvgResolution, n) += DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+			if (DIRECT_MULTIDIM_ELEM(mask(), n) == 1)
+			{
+			double Resvoxel = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+			DIRECT_MULTIDIM_ELEM(pAvgResolution, n) += Resvoxel;
+			DIRECT_MULTIDIM_ELEM(pVarianzeResolution, n) += Resvoxel*Resvoxel;
 			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)<DIRECT_MULTIDIM_ELEM(pMinResolution, n))
 				DIRECT_MULTIDIM_ELEM(pMinResolution, n) = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
 			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>DIRECT_MULTIDIM_ELEM(pMaxResolution, n))
 				DIRECT_MULTIDIM_ELEM(pMaxResolution, n) = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+			}
+			else
+			{
+				DIRECT_MULTIDIM_ELEM(pMinResolution, n) = 0;
+				DIRECT_MULTIDIM_ELEM(pMaxResolution, n) = 0;
+				DIRECT_MULTIDIM_ELEM(pAvgResolution, n) = 0;
+				DIRECT_MULTIDIM_ELEM(pVarianzeResolution, n) = 0;
+			}
 		}
 
 		MaxResolution.write(fnMaxVol);
 		MinResolution.write(fnMinVol);
 		AvgResolution.write(fnOut);
+		VarianzeResolution.write(fnVar);
 
 		double sumS=0, sumS2=0, N_elem=0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
@@ -1080,12 +1113,10 @@ void ProgResDir::run()
 		MAT_ELEM(angles, 3, dir) = sumS2/N_elem-avg*avg;
 
 		/////////////////////////
-
-
 		size_t objId;
 		objId = md.addObject();
-		md.setValue(MDL_ANGLE_ROT, rot, objId);
-		md.setValue(MDL_ANGLE_TILT, tilt, objId);
+		md.setValue(MDL_ANGLE_ROT, rot*180/PI, objId);
+		md.setValue(MDL_ANGLE_TILT, tilt*180/PI, objId);
 		md.setValue(MDL_RESOLUTION_FREQREAL, avg, objId);
 		md.setValue(MDL_STDDEV, MAT_ELEM(angles, 3, dir), objId);
 
@@ -1099,10 +1130,10 @@ void ProgResDir::run()
 		saveImg.clear();
 		#endif
 
-
 		pOutputResolution.clear();
 		pMaxResolution.clear();
 		pMinResolution.clear();
+		pVarianzeResolution.clear();
 		list.clear();
 	}
 	Image<double> VarianzeResolution, MaxResolution, MinResolution, AvgResolution;
@@ -1122,4 +1153,31 @@ void ProgResDir::run()
 	saveImg_int.write("maskfinalk.vol");
 	saveImg_int.clear();
 	#endif
+
+	MaxResolution.read(fnMaxVol);
+	MinResolution.read(fnMinVol);
+	VarianzeResolution.read(fnVar);
+
+	MultidimArray<double> &pMaxResolution = MaxResolution();
+	MultidimArray<double> &pMinResolution = MinResolution();
+	MultidimArray<double> &pVarianzeResolution = VarianzeResolution();
+
+	double max_voxel, min_voxel;
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pAvgResolution)
+	{
+		if (DIRECT_MULTIDIM_ELEM(mask(), n) == 1)
+		{
+			max_voxel = DIRECT_MULTIDIM_ELEM(pMaxResolution, n);
+			min_voxel = DIRECT_MULTIDIM_ELEM(pMinResolution, n);
+			double resmean = DIRECT_MULTIDIM_ELEM(pAvgResolution, n);
+			DIRECT_MULTIDIM_ELEM(pVarianzeResolution, n) = (DIRECT_MULTIDIM_ELEM(pVarianzeResolution, n)/N_points) - (resmean*resmean/(N_points*N_points));
+			DIRECT_MULTIDIM_ELEM(pAvgResolution, n) = (max_voxel - min_voxel)/(max_voxel + min_voxel);
+		}
+		else
+		{
+			DIRECT_MULTIDIM_ELEM(pAvgResolution, n) = 0;
+		}
+	}
+	AvgResolution.write("isotropy.vol");
+	VarianzeResolution.write(fnVar);
 }

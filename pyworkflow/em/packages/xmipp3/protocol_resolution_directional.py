@@ -45,6 +45,7 @@ FN_MEAN_VOL = 'mean_volume.vol'
 METADATA_ANGLES_FILE = 'angles_md.xmd'
 OUTPUT_RESOLUTION_MAX_FILE = 'maxResolution.vol'
 OUTPUT_RESOLUTION_MIN_FILE = 'minResolution.vol'
+OUTPUT_RESOLUTION_VAR_FILE = 'varResolution.vol'
 
 
 class XmippProtMonoDir(ProtAnalysis3D):
@@ -249,6 +250,7 @@ class XmippProtMonoDir(ProtAnalysis3D):
         params += ' --maxRes %f' % self.maxRes.get()
         params += ' --maxVol %s' % self._getExtraPath(OUTPUT_RESOLUTION_MAX_FILE)
         params += ' --minVol %s' % self._getExtraPath(OUTPUT_RESOLUTION_MIN_FILE)
+        params += ' --varVol %s' % self._getExtraPath(OUTPUT_RESOLUTION_VAR_FILE)
         params += ' --volumeRadius %f' % xdim
         params += ' --chimera_volume %s' % self._getExtraPath(OUTPUT_RESOLUTION_FILE_CHIMERA)
         params += ' --sym %s' % self.symmetry.get()
@@ -269,13 +271,6 @@ class XmippProtMonoDir(ProtAnalysis3D):
         self.runJob('xmipp_image_histogram', params)
         
         
-    def readMetaDataOutput(self):
-        mData = md.MetaData(self._getExtraPath(METADATA_MASK_FILE))
-        NvoxelsOriginalMask = float(mData.getValue(md.MDL_COUNT, mData.firstObject()))
-        NvoxelsOutputMask = float(mData.getValue(md.MDL_COUNT2, mData.firstObject()))
-        nvox = int(round(((NvoxelsOriginalMask-NvoxelsOutputMask)/NvoxelsOriginalMask)*100))
-        return nvox
-
     def createOutputStep(self):
         volume_path_max = self._getExtraPath(OUTPUT_RESOLUTION_MAX_FILE)
         volume_path_min = self._getExtraPath(OUTPUT_RESOLUTION_MIN_FILE)
