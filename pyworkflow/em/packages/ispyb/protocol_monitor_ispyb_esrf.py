@@ -1,10 +1,9 @@
+# coding: utf-8
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es) [1]
-# *              Kevin Savage (kevin.savage@diamond.ac.uk) [2]
+# * Author:     Olof Svensson (svensson@esrf.fr) [1]
 # *
-# * [1] Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
-# * [2] Diamond Light Source, Ltd
+# * [1] European Synchrotron Radiation Facility
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -26,22 +25,30 @@
 # *
 # **************************************************************************
 
-from os.path import realpath, join, dirname, exists, basename
-from collections import OrderedDict
+# This code is based on the "protocol_monitor_ispyb.py" written by
+# J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es) [1] and
+# Kevin Savage (kevin.savage@diamond.ac.uk) [2]
+# [1] Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# [2] Diamond Light Source, Ltd
+
+import os
+import collections
+import ConfigParser
+
+from suds.client import Client
+from suds.transport.http import HttpAuthenticated
 
 import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
-from pyworkflow.em import ImageHandler
 from pyworkflow.em.protocol import ProtMonitor, Monitor, PrintNotifier
 from pyworkflow.em.protocol import ProtImportMovies, ProtAlignMovies, ProtCTFMicrographs
-from pyworkflow.gui import getPILImage
 
-from ispyb_proxy import ISPyBProxy
-
+from ispyb_esrf_utils import ISPyB_ESRF_Utils
 
 class ProtMonitorISPyB_ESRF(ProtMonitor):
-    """ Monitor to communicated with ISPyB system at ESRF.
+    """ 
+    Monitor to communicated with ISPyB system at ESRF.
     """
     _label = 'monitor to ISPyB at the ESRF'
     _lastUpdateVersion = VERSION_1_1
@@ -65,10 +72,33 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
 
     #--------------------------- STEPS functions -------------------------------
     def monitorStep(self):
-        monitor = MonitorISPyB_ESRF(self, workingDir=self._getPath(),
-                                    samplingInterval=self.samplingInterval.get(),
-                                    monitorTime=100)
+        config = ConfigParser.ConfigParser()
+        credentialsConfig = ConfigParser.ConfigParser()
+    
+        # Configuration files
+        config.read(os.path.join(os.path.dirname(__file__), 'ispyb.properties'))    
+        credentialsConfig.read(os.path.join(os.path.dirname(__file__), 'credentials.properties'))
+    
+    
+        username = str(credentialsConfig.get('Credential', 'user'))
+        password = str(credentialsConfig.get('Credential', 'password'))
+        url = str(config.get('Connection', 'url'))
+    
+        # Authentication
+        httpAuthenticatedToolsForAutoprocessingWebService = HttpAuthenticated(username = username, password = password ) 
+        client = Client( url, transport = httpAuthenticatedToolsForAutoprocessingWebService, cache = None, timeout = 15 )  
+              
+        proposalCode = config.get('Proposal', 'type')
+        proposalNumber = config.get('Proposal', 'number')
 
+        sampleAcronym = "ACRONYM"
+
+        monitor = MonitorISPyB_ESRF(self, workingDir=self._getPath(),
+                                        samplingInterval=self.samplingInterval.get(),
+                                        monitorTime=100, client=client, 
+                                        proposalCode=proposalCode, proposalNumber=proposalNumber,
+                                        sampleAcronym=sampleAcronym)
+    
         monitor.addNotifier(PrintNotifier())
         monitor.loop()
 
@@ -78,14 +108,22 @@ class MonitorISPyB_ESRF(Monitor):
     It will internally handle a database to store produced
     CTF values.
     """
-    def __init__(self, protocol, **kwargs):
+    def __init__(self, protocol, client=None, 
+                 proposalCode=None, proposalNumber=None,
+                 sampleAcronym=None, **kwargs):
         Monitor.__init__(self, **kwargs)
         self.protocol = protocol
-        self.allIds = OrderedDict()
+        self.allIds = collections.OrderedDict()
         self.numberOfFrames = None
         self.imageGenerator = None
         self.proposal = self.protocol.proposal.get()
         self.project = self.protocol.getProject()
+        self.client = client
+        self.proposalCode = proposalCode
+        self.proposalNumber = proposalNumber
+        self.sampleAcronym = sampleAcronym
+        self.movieDirectory = None
+        self.currentDir = os.getcwd()
 
     def step(self):
         self.info("MonitorISPyB: only one step")
@@ -101,18 +139,19 @@ class MonitorISPyB_ESRF(Monitor):
 
         nodes = g.getRoot().iterChildsBreadth()
 
-        allParams = OrderedDict()
+        allParams = collections.OrderedDict()
 
         for n in nodes:
             prot = n.run
-            self.info("protocol: %s" % prot.getRunName())
+            self.info("Protocol name: {0}".format(prot.getRunName()))
+            self.info("Protocol: {0}".format(type(prot)))
 
             if isinstance(prot, ProtImportMovies):
-                self.create_movie_params(prot, allParams)
+                self.uploadImportMovies(prot, allParams)
             elif isinstance(prot, ProtAlignMovies) and hasattr(prot, 'outputMicrographs'):
-                self.update_align_params(prot, allParams)
+                self.uploadAlignMovies(prot, allParams)
             elif isinstance(prot, ProtCTFMicrographs):
-                self.update_ctf_params(prot, allParams)
+                self.uploadCTFMicrographs(prot, allParams)
 
         for itemId, params in allParams.iteritems():
             self.info("Params: {0}".format(params))
@@ -132,155 +171,84 @@ class MonitorISPyB_ESRF(Monitor):
             yield obj
         objSet.close()
 
-    def find_ispyb_path(self, input_file):
-        """ Given a proposal, find the path where png images should be stored. """
-        if pwutils.envVarOn('SCIPIONBOX_ISPYB_ON'):
-            p = realpath(join(self.project_path, input_file))
-            while p and not p.endswith(self.proposal):
-                p = dirname(p)
-            return join(p, '.ispyb')
-        else:
-            return self.protocol._getExtraPath()
 
-    def create_movie_params(self, prot, allParams):
-
+    def uploadImportMovies(self, prot, allParams):
         for movie in self.iter_updated_set(prot.outputMovies):
-            movieFn = movie.getFileName()
-            if self.numberOfFrames is None:
-                self.numberOfFrames = movie.getNumberOfFrames()
-#                 images_path = self.find_ispyb_path(movieFn)
-                images_path = "/tmp"
-                self.imageGenerator = ImageGenerator(self.project.path,
-                                                     images_path,
-                                                     smallThumb=512)
-
+            movieFilePath = movie.getFileName()
             movieId = movie.getObjId()
+            
+            filesPath = prot.filesPath.get('').strip()
+            self.movieDirectory = os.path.dirname(filesPath)
+            
+            jpeg, mrc, xml = ISPyB_ESRF_Utils.getMovieJpegMrcXml(filesPath)
+            
+            self.info("ESRF ISPyB upload import movies:")
+            self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
+            self.info("sampleAcronym: {0}".format(self.sampleAcronym))
+            self.info("imageDirectory: {0}".format(self.movieDirectory))
+            self.info("jpeg: {0}".format(jpeg))
+            self.info("mrc: {0}".format(mrc))
+            self.info("xml: {0}".format(xml))
+            
+            self.client.service.addMovie(proposal=self.proposalCode+self.proposalNumber, 
+                                        sampleAcronym=self.sampleAcronym, 
+                                        imageDirectory=self.movieDirectory,
+                                        jpeg=jpeg,
+                                        mrc=mrc,
+                                        xml=xml)
 
             allParams[movieId] = {
                 'id': self.allIds.get(movieId, None),
-                'imgdir': dirname(movieFn),
-                'imgprefix': pwutils.removeBaseExt(movieFn),
-                'imgsuffix': pwutils.getExt(movieFn),
-                'file_template': movieFn,
+                'imgdir': os.path.dirname(movieFilePath),
+                'imgprefix': pwutils.removeBaseExt(movieFilePath),
+                'imgsuffix': pwutils.getExt(movieFilePath),
+                'file_template': movieFilePath,
                 'n_images': self.numberOfFrames
              }
             self.info("allParams: {0}".format(allParams))
 
-    def update_align_params(self, prot, allParams):
+    def uploadAlignMovies(self, prot, allParams):
         self.info("allParams: {0}".format(dict(allParams)))
         self.info("prot.outputMicrographs: {0}".format(prot.outputMicrographs))
-        for mic in self.iter_updated_set(prot.outputMicrographs):
-            self.info("mic")
-            micFn = mic.getFileName()
-            self.info("micFn: {0}".format(micFn))
-#             renderable_image = self.imageGenerator.generate_image(micFn, micFn)
-            renderable_image = None
-            
-            allParams[mic.getObjId()].update({
-                'comments': 'aligned',
-                'xtal_snapshot1':renderable_image
-            })
+        for micrograph in self.iter_updated_set(prot.outputMicrographs):
+            mrcFilePath = os.path.join(self.currentDir, micrograph.getFileName())
+            png, logFilePath = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
+            jpeg = "/data/motionCorrJpegePath"
+            self.info("ESRF ISPyB upload align movies:")
+            self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
+            self.info("imageDirectory: {0}".format(self.movieDirectory))
+            self.info("jpeg: {0}".format(jpeg))
+            self.info("mrc: {0}".format(mrcFilePath))
+            self.info("logFilePath: {0}".format(logFilePath))
+            self.client.service.addMotionCorrection(proposal=self.proposalCode+self.proposalNumber, 
+                                                    imageDirectory=self.movieDirectory,
+                                                    jpeg=jpeg,
+                                                    png=png,
+                                                    mrc=mrcFilePath,
+                                                    logFilePath=logFilePath)
 
-    def update_ctf_params(self, prot, allParams):
+    def uploadCTFMicrographs(self, prot, allParams):
+        self.info("ESRF ISPyB upload ctf micrographs:")
+        self.info("allParams: {0}".format(dict(allParams)))
+        workingDir = os.path.join(self.currentDir, str(prot.workingDir))
+        self.info("workingDir: {0}".format(workingDir))
         for ctf in self.iter_updated_set(prot.outputCTF):
-            micFn = ctf.getMicrograph().getFileName()
-            psdName = pwutils.replaceBaseExt(micFn, 'psd.png')
-            psdFn = ctf.getPsdFile()
-            psdPng = self.imageGenerator.generate_image(psdFn, psdName)
-            allParams[ctf.getObjId()].update({
-            'min_defocus': ctf.getDefocusU(),
-            'max_defocus': ctf.getDefocusV(),
-            'amount_astigmatism': ctf.getDefocusRatio()
-            })
-
-
-class ImageGenerator:
-    def __init__(self, project_path, images_path,
-                 bigThumb=None, smallThumb=None):
-        self.project_path = project_path
-        self.images_path = images_path
-        self.ih = ImageHandler()
-        self.img = self.ih.createImage()
-        self.bigThumb = bigThumb
-        self.smallThumb = smallThumb
-
-    def generate_image(self, input_file, outputName=None):
-        output_root = join(self.images_path, basename(outputName))
-        output_file = output_root + '.png'
-
-        print "Generating image: ", output_file
-
-        if not exists(output_file):
-            from PIL import Image
-            self.img.read(join(self.project_path, input_file))
-            pimg = getPILImage(self.img)
-
-            pwutils.makeFilePath(output_file)
-            if self.bigThumb:
-                pimg.save(output_file, "PNG")
-
-            if self.smallThumb:
-                pimg.thumbnail((self.smallThumb, self.smallThumb), Image.ANTIALIAS)
-                pimg.save(output_root + 't.png', "PNG")
-
-        return output_file
-
-
-def _loadMeanShifts(self, movie):
-    alignMd = md.MetaData(self._getOutputShifts(movie))
-    meanX = alignMd.getColumnValues(md.MDL_OPTICALFLOW_MEANX)
-    meanY = alignMd.getColumnValues(md.MDL_OPTICALFLOW_MEANY)
-
-    return meanX, meanY
-
-
-def _saveAlignmentPlots(self, movie):
-    """ Compute alignment shifts plot and save to file as a png image. """
-    meanX, meanY = self._loadMeanShifts(movie)
-    plotter = createAlignmentPlot(meanX, meanY)
-    plotter.savefig(self._getPlotCart(movie))
-
-
-def createAlignmentPlot(meanX, meanY):
-    """ Create a plotter with the cumulative shift per frame. """
-    sumMeanX = []
-    sumMeanY = []
-    figureSize = (8, 6)
-    plotter = Plotter(*figureSize)
-    figure = plotter.getFigure()
-
-    preX = 0.0
-    preY = 0.0
-    sumMeanX.append(0.0)
-    sumMeanY.append(0.0)
-    ax = figure.add_subplot(111)
-    ax.grid()
-    ax.set_title('Cartesian representation')
-    ax.set_xlabel('Drift x (pixels)')
-    ax.set_ylabel('Drift y (pixels)')
-    ax.plot(0, 0, 'yo-')
-    i = 1
-    for x, y in izip(meanX, meanY):
-        preX += x
-        preY += y
-        sumMeanX.append(preX)
-        sumMeanY.append(preY)
-        #ax.plot(preX, preY, 'yo-')
-        ax.text(preX-0.02, preY+0.02, str(i))
-        i += 1
-
-    ax.plot(sumMeanX, sumMeanY, color='b')
-    ax.plot(sumMeanX, sumMeanY, 'yo')
-
-    plotter.tightLayout()
-
-    return plotter
-
-
-class FileNotifier():
-    def __init__(self, filename):
-        self.f = open(filename, 'w')
-
-    def notify(self, title, message):
-        print >> self.f, title, message
-        self.f.flush()
+            jpeg = "/data/ctfJpeg"
+            mrcFilePath = ctf.getMicrograph().getFileName()
+            self.info("mrcFilePath: {0}".format(mrcFilePath))
+            ctfMrcFilePath, outputOne, outputTwo, logFilePath = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
+            self.info("ESRF ISPyB upload align movies:")
+            self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
+            self.info("imageDirectory: {0}".format(self.movieDirectory))
+            self.info("jpeg: {0}".format(jpeg))
+            self.info("mrc: {0}".format(ctfMrcFilePath))
+            self.info("outputOne: {0}".format(outputOne))
+            self.info("outputTwo: {0}".format(outputTwo))
+            self.info("logFilePath: {0}".format(logFilePath))
+            self.client.service.addCTF(proposal=self.proposalCode+self.proposalNumber, 
+                                       imageDirectory=self.movieDirectory,
+                                       jpeg=jpeg,
+                                       mrc=ctfMrcFilePath,
+                                       outputOne=outputOne,
+                                       outputTwo=outputTwo,
+                                       logFilePath=logFilePath)
