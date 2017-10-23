@@ -236,15 +236,16 @@ class MonitorISPyB_ESRF(Monitor):
             jpeg = "/data/ctfJpeg"
             mrcFilePath = ctf.getMicrograph().getFileName()
             self.info("mrcFilePath: {0}".format(mrcFilePath))
-            ctfMrcFilePath, outputOne, outputTwo, logFilePath = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
+            dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
             self.info("ESRF ISPyB upload align movies:")
             self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
             self.info("imageDirectory: {0}".format(self.movieDirectory))
-            self.info("jpeg: {0}".format(jpeg))
-            self.info("mrc: {0}".format(ctfMrcFilePath))
-            self.info("outputOne: {0}".format(outputOne))
-            self.info("outputTwo: {0}".format(outputTwo))
-            self.info("logFilePath: {0}".format(logFilePath))
+            self.info("defocusU: {0}".format(dictResults["defocusU"]))
+            self.info("defocusV: {0}".format(dictResults["defocusV"]))
+            self.info("crossCorrelationCoefficient: {0}".format(dictResults["crossCorrelationCoefficient"]))
+            self.info("resolutionLimit: {0}".format(dictResults["resolutionLimit"]))
+            self.info("estimatedBfactor: {0}".format(dictResults["estimatedBfactor"]))
+            self.info("logFilePath: {0}".format(dictResults["logFilePath"]))
             self.client.service.addCTF(proposal=self.proposalCode+self.proposalNumber, 
                                        imageDirectory=self.movieDirectory,
                                        jpeg=jpeg,

@@ -25,6 +25,7 @@
 # *
 # **************************************************************************
 
+import pprint
 import unittest
 from ispyb_esrf_utils import ISPyB_ESRF_Utils
 
@@ -40,12 +41,18 @@ class Test(unittest.TestCase):
         mrcFilePath = "/users/svensson/cryoem/testRunData/000580_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
         png, logFilePath = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
         print(png, logFilePath)
+        
+    def test_getXmlMetaData(self):
+        xmlMetaDataFullPath = "/scisoft/data/cryoem/CWAT_ESRF_MicroscopePC/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150716_Data_19148705_19148706_20170619_1744.xml"
+        dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
+        pprint.pprint(dictResults)
+    
 
     def test_getCtfMetaData(self):
-        workingDir = "/users/svensson/cryoem/testRunData/000680_ProtGctf"
-        mrcFilePath = "/users/svensson/cryoem/testRunData/000580_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
-        ctfMrcFilePath, outputOne, outputTwo, logFilePath = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
-        print(ctfMrcFilePath, outputOne, outputTwo, logFilePath)
+        workingDir = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000977_ProtGctf"
+        mrcFilePath = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
+        dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
+        pprint.pprint(dictResults)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

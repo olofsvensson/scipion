@@ -27,7 +27,11 @@
 
 
 import os
+import re
 import glob
+import pprint
+import xml.etree.ElementTree
+
 
 class ISPyB_ESRF_Utils(object):
 
@@ -84,19 +88,128 @@ class ISPyB_ESRF_Utils(object):
         logFilePath = os.path.join(os.path.dirname(mrcDirectory), "logs", "run.log")
         return png, logFilePath
     
+    @staticmethod
+    def etree_to_dict(t):
+        p = re.compile("^\{(.*)\}")
+        m = p.match(t.tag)
+        if m is not None:
+            t.tag = t.tag[m.span()[1]:]
+        listTmp = map(ISPyB_ESRF_Utils.etree_to_dict, t.getchildren())
+        if len(listTmp) > 0:
+            d = {t.tag : listTmp}
+        else:
+            d = {t.tag : t.text}
+        return d
+ 
+    @staticmethod
+    def get_recursively(search_dict, field):
+        """
+        Takes a dict with nested lists and dicts,
+        and searches all dicts for a key of the field
+        provided.
+        See: https://stackoverflow.com/questions/14962485/finding-a-key-recursively-in-a-dictionary
+        """
+        fields_found = []
+    
+        for key, value in search_dict.iteritems():
+    
+            if key == field:
+                fields_found.append(value)
+    
+            elif isinstance(value, dict):
+                results = ISPyB_ESRF_Utils.get_recursively(value, field)
+                for result in results:
+                    fields_found.append(result)
+    
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        more_results = ISPyB_ESRF_Utils.get_recursively(item, field)
+                        for another_result in more_results:
+                            fields_found.append(another_result)
+    
+        return fields_found
+    
+    @staticmethod
+    def getXmlMetaData(xmlMetaDataPath):
+        dictResults = {}
+        root = xml.etree.ElementTree.parse(xmlMetaDataPath).getroot()
+        dictXML = ISPyB_ESRF_Utils.etree_to_dict(root)
+        listKeyValue = ISPyB_ESRF_Utils.get_recursively(dictXML, "KeyValueOfstringanyType")
+        for dictKey, dictValue in listKeyValue:
+            if dictKey["Key"] == "Dose":
+                dictResults["dose"] = dictValue["Value"]
+        dictResults["numberOffractions"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "NumberOffractions")[0]
+        dictResults["nominalMagnification"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "NominalMagnification")[0]
+        dictResults["positionX"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "X")[0]
+        dictResults["positionY"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "Y")[0]
+        dictResults["accelerationVoltage"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "AccelerationVoltage")[0]
+        dictResults["acquisitionDateTime"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "acquisitionDateTime")[0]
+        return dictResults
+
+    @staticmethod
+    def _getKeyValue(root, key):
+        value = None
+        keyFound = False
+        for child in root:
+            for subChild in child:
+                if subChild.tag.endswith("Key") and subChild.text == key:
+                    keyFound = True
+                if keyFound and subChild.tag.endswith("Value"):
+                    value = subChild.text
+                    keyFound = False
+                    break
+        return value
+        
+    
+    
     @ staticmethod
     def getCtfMetaData(workingDir, mrcFilePath):
-        ctfMrcFilePath = None
-        outputOne = None
-        outputTwo = None
-        logFilePath = None
+        dictResults = {
+            "spectraImageThumbnailPath": None,
+            "spectraImagePath": None,
+            "defocusU": None,
+            "defocusV": None,
+            "angle": None,
+            "crossCorrelationCoefficient": None,
+            "resolutionLimit": None,
+            "estimatedBfactor": None,
+            "logFilePath": None,
+        }
         # Find MRC directory
         mrcFileName = os.path.splitext(os.path.basename(mrcFilePath))[0]
         mrcDirectory = os.path.join(workingDir, "extra", mrcFileName)
         if os.path.exists(mrcDirectory):
-            ctfMrcFilePath = os.path.join(mrcDirectory, "ctfEstimation.mrc")
-            outputOne = os.path.join(mrcDirectory, "ctfEstimation.txt")
-            outputTwo = os.path.join(mrcDirectory, "ctfEstimation_EPA.txt")
+            spectraImagePath = os.path.join(mrcDirectory, "ctfEstimation.mrc")
+            if os.path.exists(spectraImagePath):
+                dictResults["spectraImagePath"] = spectraImagePath
+                spectraImageThumbnailPath = os.path.join(mrcDirectory, "ctfEstimation.jpeg")
+                os.system("bimg {0} {1}".format(spectraImagePath, spectraImageThumbnailPath))
+                if os.path.exists(spectraImageThumbnailPath):
+                    dictResults["spectraImageThumbnailPath"] = spectraImageThumbnailPath
+            ctfEstimationPath = os.path.join(mrcDirectory, "ctfEstimation.txt")
+            if os.path.exists(ctfEstimationPath):
+                f = open(ctfEstimationPath)
+                lines = f.readlines()
+                f.close()
+                index = 0
+                for index in range(len(lines)):
+                    if "Defocus_U" in lines[index]:
+                        index += 1
+                        listValues = lines[index].split()
+                        dictResults["defocusU"] = listValues[0]
+                        dictResults["defocusV"] = listValues[1]
+                        dictResults["angle"] = listValues[2]
+                        dictResults["crossCorrelationCoefficient"] = listValues[3]
+                    elif "Resolution limit" in lines[index]:
+                        listValues = lines[index].split()
+                        print(listValues)
+                        dictResults["resolutionLimit"] = listValues[-2]
+                    elif "Estimated Bfactor" in lines[index]:
+                        listValues = lines[index].split()
+                        dictResults["estimatedBfactor"] = listValues[-2]
         # Find log file
         logFilePath = os.path.join(workingDir, "logs", "run.log")
-        return ctfMrcFilePath, outputOne, outputTwo, logFilePath
+        if os.path.exists(logFilePath):
+            dictResults["logFilePath"] = logFilePath
+        return dictResults

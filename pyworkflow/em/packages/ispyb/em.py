@@ -26,8 +26,13 @@
 # *
 # **************************************************************************
 
+import datetime
+
 from suds.client import Client
 from suds.transport.http import HttpAuthenticated
+from suds.sax.date import DateTime
+
+
 import ConfigParser
 
 
@@ -54,39 +59,93 @@ if __name__ == "__main__":
 
 
 	sampleAcronym = "ACRONYM"
-	imageDirectory = "/data/imageDirectory"
-	jpeg = "/data/jpeg"
-	mrc = "/data/mrc"
-	xml = "/data/xml"
-
-	client.service.addMovie(proposal=proposalCode+proposalNumber, 
+	movieDirectory = "/data/imageDirectory2"
+	movieFullPath = "/data/imageDirectory/fileName.mrc"
+	movieNumber = "301"
+	micrographFullPath = "/data/pyarch/fileName.mrc"
+	micrographSnapshotFullPath = "/data/pyarch/fileName.png"
+	xmlMetaDataFullPath = "/data/pyarch/fileName.png"
+	voltage = "200.0"
+	sphericalAberration = "2.0"
+	amplitudeContrast = "0.1"
+	magnification = "5000"
+	scannedPixelSize = "7.0"
+	imagesCount = "28"
+	dosePerImage = "1.0"
+	positionX = "101"
+	positionY = "102"
+	beamlineName = "cm01"			
+	if True:								
+		movieObject = client.service.addMovie(proposal=proposalCode+proposalNumber, 
 							sampleAcronym=sampleAcronym, 
-							imageDirectory=imageDirectory,
-							jpeg=jpeg,
-							mrc=mrc,
-							xml=xml)
+							movieDirectory=movieDirectory,
+							movieFullPath=movieFullPath,
+							movieNumber=movieNumber,
+							micrographFullPath=micrographFullPath,
+							micrographSnapshotFullPath=micrographSnapshotFullPath,
+							xmlMetaDataFullPath=xmlMetaDataFullPath,
+							voltage=voltage,
+							sphericalAberration=sphericalAberration,
+							amplitudeContrast=amplitudeContrast,
+							magnification=magnification,
+							scannedPixelSize=scannedPixelSize,
+							imagesCount=imagesCount,
+							dosePerImage=dosePerImage,
+							positionX=positionX,
+							positionY=positionY,
+							beamlineName=beamlineName,
+							)
 	
-	jpeg = "/data/motionCorrJpeg"
-	mrc = "/data/motionCorrMrc"
-	png = "/data/motionCorrPng"
-	logFilePath = "/data/motionCorrLogFilePath"
-	client.service.addMotionCorrection(proposal=proposalCode+proposalNumber, 
-									imageDirectory=imageDirectory,
-									jpeg=jpeg,
-									png=png,
-									mrc=mrc,
-									logFilePath=logFilePath)
+		print(movieObject)
+	firstFrame = 1
+	lastFrame = 28
+	dosePerFrame = 1.0 
+	doseWeight = 2.0
+	totalMotion = 3.0
+	averageMotionPerFrame = 4.0 
+	driftPlotFullPath = "/data/pyarch/motionCorr.jpeg"
+	micrographFullPath = "/data/pyarch/motionCorr.mrc"
+	correctedDoseMicrographFullPath = "/data/pyarch/motionCorr_DW.mrc"
+	micrographSnapshotFullPath = "/data/pyarch/motionCorr.png"
+	logFileFullPath = "/data/pyarch/motionCorrLog.txt"
+
 	
-	jpeg = "/data/ctfJpeg"
-	mrc = "/data/ctfMrc"
-	outputOne = "/data/ctfOutputOne"
-	outputTwo = "/data/ctfOutputTwo"
-	logFilePath = "/data/ctfLogFilePath"
-	client.service.addCTF(proposal=proposalCode+proposalNumber, 
-							imageDirectory=imageDirectory,
-							jpeg=jpeg,
-							mrc=mrc,
-							outputOne=outputOne,
-							outputTwo=outputTwo,
+	if True:								
+		motionCorrectionObject = client.service.addMotionCorrection(proposal=proposalCode+proposalNumber, 
+											movieFullPath=movieFullPath,
+											firstFrame=firstFrame,
+											lastFrame=lastFrame,
+											dosePerFrame=dosePerFrame,
+											doseWeight=doseWeight,
+											totalMotion=totalMotion,
+											averageMotionPerFrame=averageMotionPerFrame,
+											driftPlotFullPath=driftPlotFullPath,
+											micrographFullPath=micrographFullPath,
+											correctedDoseMicrographFullPath=correctedDoseMicrographFullPath,
+											micrographSnapshotFullPath=micrographSnapshotFullPath,
+											logFileFullPath=logFileFullPath)
+		print(motionCorrectionObject)
+		
+	
+	spectraImageThumbnailFullPath = "/data/pyarch/ctf.jpeg"
+	spectraImageFullPath = "/data/pyarch/ctf.mrc"
+	defocusU = "1"
+	defocusV = "2"
+	angle = "22"
+	crossCorrelationCoefficient = "3"
+	resolutionLimit = "4"
+	estimatedBfactor = "5"
+	logFilePath = "/data/pyarch/ctfLogFile.txt"
+	if True:
+		ctfObject = client.service.addCTF(proposal=proposalCode+proposalNumber, 
+							movieFullPath=movieFullPath,
+							spectraImageThumbnailFullPath=spectraImageThumbnailFullPath,
+							spectraImageFullPath=spectraImageFullPath,
+							defocusU=defocusU,
+							defocusV=defocusV,
+							angle=angle,
+							crossCorrelationCoefficient=crossCorrelationCoefficient,
+							resolutionLimit=resolutionLimit,
+							estimatedBfactor=estimatedBfactor,
 							logFilePath=logFilePath)
-	
+		print(ctfObject)
