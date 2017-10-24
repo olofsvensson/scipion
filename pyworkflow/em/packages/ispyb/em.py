@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
 	sampleAcronym = "ACRONYM"
 	movieDirectory = "/data/imageDirectory2"
-	movieFullPath = "/data/imageDirectory/fileName.mrc"
+	movieFullPath = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
 	movieNumber = "301"
 	micrographFullPath = "/data/pyarch/fileName.mrc"
 	micrographSnapshotFullPath = "/data/pyarch/fileName.png"
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 		print(motionCorrectionObject)
 		
 	
-	spectraImageThumbnailFullPath = "/data/pyarch/ctf.jpeg"
+	spectraImageSnapshotFullPath = "/data/pyarch/ctf.jpeg"
 	spectraImageFullPath = "/data/pyarch/ctf.mrc"
 	defocusU = "1"
 	defocusV = "2"
@@ -136,10 +136,10 @@ if __name__ == "__main__":
 	resolutionLimit = "4"
 	estimatedBfactor = "5"
 	logFilePath = "/data/pyarch/ctfLogFile.txt"
-	if True:
+	if False:
 		ctfObject = client.service.addCTF(proposal=proposalCode+proposalNumber, 
 							movieFullPath=movieFullPath,
-							spectraImageThumbnailFullPath=spectraImageThumbnailFullPath,
+							spectraImageSnapshotFullPath=spectraImageSnapshotFullPath,
 							spectraImageFullPath=spectraImageFullPath,
 							defocusU=defocusU,
 							defocusV=defocusV,

@@ -29,6 +29,7 @@
 import os
 import re
 import glob
+import time
 import pprint
 import xml.etree.ElementTree
 
@@ -75,18 +76,24 @@ class ISPyB_ESRF_Utils(object):
 
     @staticmethod
     def getAlignMoviesPngLogFilePath(mrcFilePath):
-        png = None
-        logFilePath = None
+        dictResult = {}
         # Locate png file in same directory
         mrcDirectory = os.path.dirname(mrcFilePath)
         listPng = glob.glob(os.path.join(mrcDirectory, "*.png"))
-        if len(listPng) > 1:
-            print("WARNING! More than one PNG file found in ISPyB_ESRF_Utils.getAlignMoviesJpegMrcXml")
-        elif len(listPng) > 0:
-            png = listPng[0]
+        for pngFile in listPng:
+            dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(pngFile)
+            if dictFileNameParameters["extra"] == "_global_shifts":
+                dictResult["globalShiftPng"] = pngFile
+            elif dictFileNameParameters["extra"] == "_thumbnail":
+                dictResult["thumbnailPng"] = pngFile
+        listMrc = glob.glob(os.path.join(mrcDirectory, "*.mrc"))
+        for mrcFile in listMrc:
+            dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(mrcFile)
+            if "DW" in dictFileNameParameters["extra"]:
+                dictResult["doseWeightMrc"] = mrcFile            
         # Find log file
-        logFilePath = os.path.join(os.path.dirname(mrcDirectory), "logs", "run.log")
-        return png, logFilePath
+        dictResult["logFileFullPath"] = os.path.join(os.path.dirname(mrcDirectory), "logs", "run.log")
+        return dictResult
     
     @staticmethod
     def etree_to_dict(t):
@@ -131,9 +138,9 @@ class ISPyB_ESRF_Utils(object):
         return fields_found
     
     @staticmethod
-    def getXmlMetaData(xmlMetaDataPath):
+    def getXmlMetaData(xmlMetaDataFullPath):
         dictResults = {}
-        root = xml.etree.ElementTree.parse(xmlMetaDataPath).getroot()
+        root = xml.etree.ElementTree.parse(xmlMetaDataFullPath).getroot()
         dictXML = ISPyB_ESRF_Utils.etree_to_dict(root)
         listKeyValue = ISPyB_ESRF_Utils.get_recursively(dictXML, "KeyValueOfstringanyType")
         for dictKey, dictValue in listKeyValue:
@@ -213,3 +220,47 @@ class ISPyB_ESRF_Utils(object):
         if os.path.exists(logFilePath):
             dictResults["logFilePath"] = logFilePath
         return dictResults
+
+    @ staticmethod
+    def getMovieFileNameParameters(mrcFilePath):
+        """
+        FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc
+        """
+        dictResult = {}
+        p = re.compile("^(.*)/(.*)_([0-9]*)_Data_([0-9]*)_([0-9]*)_([0-9]*)_([0-9]*)-([0-9]*)(_?.*)\.(.*)")
+        m = p.match(mrcFilePath)
+        dictResult["directory"] = m.group(1)   
+        dictResult["prefix"] = m.group(2)   
+        dictResult["id1"] = m.group(3)   
+        dictResult["id2"] = m.group(4)   
+        dictResult["id3"] = m.group(5)   
+        dictResult["date"] = m.group(6)   
+        dictResult["hour"] = m.group(7)   
+        dictResult["movieNumber"] = m.group(8)   
+        dictResult["extra"] = m.group(9)   
+        dictResult["suffix"] = m.group(10)   
+        return dictResult
+
+    @ staticmethod
+    def copyToPyarchPath(filePath):
+        # Test path:
+        testPath = "/data/pyarch/2017/cm01/test"
+        # Add date
+        datePath = os.path.join(testPath, time.strftime("%Y%m%d", time.localtime(time.time())))
+        # Loop until done
+        isDone = False
+        fileName = os.path.basename(filePath)
+        pyarchFilePath = None
+        while not isDone:
+            timePath = os.path.join(datePath, time.strftime("%H%M%S", time.localtime(time.time())))
+            print(timePath)
+            if os.path.exists(timePath):
+                time.sleep(1)
+            else:
+                os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
+                pyarchFilePath = os.path.join(timePath, fileName)
+                os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+                isDone = True
+        return pyarchFilePath
+        
+                

@@ -32,27 +32,43 @@ from ispyb_esrf_utils import ISPyB_ESRF_Utils
 class Test(unittest.TestCase):
 
 
+    def tes_getMovieFileNameParameters(self):
+        movieFullPath = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
+        dictResult = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
+        pprint.pprint(dictResult)
+        self.assertEqual(dictResult["movieNumber"], "0344")
+        mrcFullPath = "/users/svensson/ScipionUserData/projects/TestPipeLine/Runs/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
+        dictResult = ISPyB_ESRF_Utils.getMovieFileNameParameters(mrcFullPath)
+        pprint.pprint(dictResult)
+        
+        
+
     def tes_getMovieJpegMrcXml(self):
-        movieFilename = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
-        jpeg, mrc, xml =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFilename)
+        movieFullPath = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
+        jpeg, mrc, xml =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
         print(jpeg, mrc, xml)
 
-    def tes_getAlignMoviesPngLogFilePath(self):
-        mrcFilePath = "/users/svensson/cryoem/testRunData/000580_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
-        png, logFilePath = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
-        print(png, logFilePath)
+    def test_getAlignMoviesPngLogFilePath(self):
+        mrcFilePath = "/users/svensson/ScipionUserData/projects/TestPipeLine/Runs/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
+        dictResult = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
+        pprint.pprint(dictResult)
         
-    def test_getXmlMetaData(self):
+    def tes_getXmlMetaData(self):
         xmlMetaDataFullPath = "/scisoft/data/cryoem/CWAT_ESRF_MicroscopePC/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150716_Data_19148705_19148706_20170619_1744.xml"
         dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
         pprint.pprint(dictResults)
     
 
-    def test_getCtfMetaData(self):
+    def tes_getCtfMetaData(self):
         workingDir = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000977_ProtGctf"
         mrcFilePath = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
         dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
         pprint.pprint(dictResults)
+        
+    def tes_copyToPyarchPath(self):
+        mrcFilePath = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
+        pyarchFilePath = ISPyB_ESRF_Utils.copyToPyarchPath(mrcFilePath)
+        print(pyarchFilePath)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -32,6 +32,7 @@
 # [2] Diamond Light Source, Ltd
 
 import os
+import pprint
 import collections
 import ConfigParser
 
@@ -124,6 +125,7 @@ class MonitorISPyB_ESRF(Monitor):
         self.sampleAcronym = sampleAcronym
         self.movieDirectory = None
         self.currentDir = os.getcwd()
+        self.beamlineName = "cm01"
 
     def step(self):
         self.info("MonitorISPyB: only one step")
@@ -177,33 +179,78 @@ class MonitorISPyB_ESRF(Monitor):
             movieFilePath = movie.getFileName()
             movieId = movie.getObjId()
             
-            filesPath = prot.filesPath.get('').strip()
-            self.movieDirectory = os.path.dirname(filesPath)
+            movieFullPath = prot.filesPath.get('').strip()
+            dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
+            self.movieDirectory = dictFileNameParameters["directory"]
+            prefix = dictFileNameParameters["prefix"]   
+            id1 = dictFileNameParameters["id1"]   
+            id2 = dictFileNameParameters["id2"]   
+            id3 = dictFileNameParameters["id3"]   
+            date = dictFileNameParameters["date"]   
+            hour = dictFileNameParameters["hour"]   
+            movieNumber = dictFileNameParameters["movieNumber"]   
+            suffix = dictFileNameParameters["suffix"]               
             
-            jpeg, mrc, xml = ISPyB_ESRF_Utils.getMovieJpegMrcXml(filesPath)
+            self.movieDirectory = os.path.dirname(movieFullPath)
+            
+            micrographSnapshotFullPath, micrographFullPath, xmlMetaDataFullPath = ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
+ 
+            micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
+            micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
+            xmlMetaDataPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(xmlMetaDataFullPath)
+                        
+            dictMetaData = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
+            voltage = dictMetaData["accelerationVoltage"]
+            magnification = dictMetaData["nominalMagnification"]
+            imagesCount = dictMetaData["numberOffractions"]
+            positionX = dictMetaData["positionX"]
+            positionY = dictMetaData["positionY"]
+            dosePerImage = dictMetaData["dose"]
+            sphericalAberration = None
+            amplitudeContrast = None
+            scannedPixelSize = None
             
             self.info("ESRF ISPyB upload import movies:")
             self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
             self.info("sampleAcronym: {0}".format(self.sampleAcronym))
             self.info("imageDirectory: {0}".format(self.movieDirectory))
-            self.info("jpeg: {0}".format(jpeg))
-            self.info("mrc: {0}".format(mrc))
-            self.info("xml: {0}".format(xml))
+            self.info("micrographSnapshotFullPath: {0}".format(micrographSnapshotFullPath))
+            self.info("micrographSnapshotPyarchPath: {0}".format(micrographSnapshotPyarchPath))
+            self.info("micrographFullPath: {0}".format(micrographPyarchPath))
+            self.info("xmlMetaDataFullPath: {0}".format(xmlMetaDataPyarchPath))
             
-            self.client.service.addMovie(proposal=self.proposalCode+self.proposalNumber, 
-                                        sampleAcronym=self.sampleAcronym, 
-                                        imageDirectory=self.movieDirectory,
-                                        jpeg=jpeg,
-                                        mrc=mrc,
-                                        xml=xml)
+            movieObject = self.client.service.addMovie(proposal=self.proposalCode+self.proposalNumber, 
+                            sampleAcronym=self.sampleAcronym, 
+                            movieDirectory=self.movieDirectory,
+                            movieFullPath=movieFullPath,
+                            movieNumber=movieNumber,
+                            micrographFullPath=micrographPyarchPath,
+                            micrographSnapshotFullPath=micrographSnapshotPyarchPath,
+                            xmlMetaDataFullPath=xmlMetaDataPyarchPath,
+                            voltage=voltage,
+                            sphericalAberration=sphericalAberration,
+                            amplitudeContrast=amplitudeContrast,
+                            magnification=magnification,
+                            scannedPixelSize=scannedPixelSize,
+                            imagesCount=imagesCount,
+                            dosePerImage=dosePerImage,
+                            positionX=positionX,
+                            positionY=positionY,
+                            beamlineName=self.beamlineName,
+                            )
+            self.info("movieObject: {0}".format(pprint.pformat(dict(movieObject))))
+            movieId = movieObject.movieId
 
-            allParams[movieId] = {
-                'id': self.allIds.get(movieId, None),
-                'imgdir': os.path.dirname(movieFilePath),
-                'imgprefix': pwutils.removeBaseExt(movieFilePath),
-                'imgsuffix': pwutils.getExt(movieFilePath),
-                'file_template': movieFilePath,
-                'n_images': self.numberOfFrames
+            allParams[movieNumber] = {
+                "movieFullPath": movieFullPath,
+                "prefix": prefix,   
+                "id1": id1,   
+                "id2": id2,   
+                "id3": id3,   
+                "date": date,   
+                "hour": hour,   
+                "movieId": movieId,   
+                "suffix": suffix,               
              }
             self.info("allParams: {0}".format(allParams))
 
@@ -211,21 +258,56 @@ class MonitorISPyB_ESRF(Monitor):
         self.info("allParams: {0}".format(dict(allParams)))
         self.info("prot.outputMicrographs: {0}".format(prot.outputMicrographs))
         for micrograph in self.iter_updated_set(prot.outputMicrographs):
-            mrcFilePath = os.path.join(self.currentDir, micrograph.getFileName())
-            png, logFilePath = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
-            jpeg = "/data/motionCorrJpegePath"
-            self.info("ESRF ISPyB upload align movies:")
-            self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
-            self.info("imageDirectory: {0}".format(self.movieDirectory))
-            self.info("jpeg: {0}".format(jpeg))
-            self.info("mrc: {0}".format(mrcFilePath))
-            self.info("logFilePath: {0}".format(logFilePath))
-            self.client.service.addMotionCorrection(proposal=self.proposalCode+self.proposalNumber, 
-                                                    imageDirectory=self.movieDirectory,
-                                                    jpeg=jpeg,
-                                                    png=png,
-                                                    mrc=mrcFilePath,
-                                                    logFilePath=logFilePath)
+            micrographFullPath = os.path.join(self.currentDir, micrograph.getFileName())
+            self.info("micrographFullPath: {0}".format(micrographFullPath))
+            dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
+            movieNumber = dictFileNameParameters["movieNumber"]
+            if movieNumber in allParams:
+                movieFullPath = allParams[movieNumber]["movieFullPath"]
+                dictResult = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(micrographFullPath)
+                driftPlotFullPath = dictResult["globalShiftPng"]
+                correctedDoseMicrographFullPath = dictResult["doseWeightMrc"]
+                micrographSnapshotFullPath = dictResult["thumbnailPng"]
+                logFileFullPath = dictResult["logFileFullPath"]
+                firstFrame = 1
+                lastFrame = 28
+                dosePerFrame = 1.0 
+                doseWeight = 2.0
+                totalMotion = 3.0
+                averageMotionPerFrame = 4.0 
+                driftPlotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(driftPlotFullPath)
+                micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
+                correctedDoseMicrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(correctedDoseMicrographFullPath)
+                micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
+                logFilePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(logFileFullPath)
+                self.info("ESRF ISPyB upload align movies:")
+                self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
+                self.info("movieFullPath: {0}".format(movieFullPath))
+                self.info("firstFrame: {0}".format(firstFrame))
+                self.info("lastFrame: {0}".format(lastFrame))
+                self.info("dosePerFrame: {0}".format(dosePerFrame))
+                self.info("doseWeight: {0}".format(doseWeight))
+                self.info("totalMotion: {0}".format(totalMotion))
+                self.info("averageMotionPerFrame: {0}".format(averageMotionPerFrame))
+                self.info("driftPlotFullPath: {0}".format(driftPlotPyarchPath))
+                self.info("micrographFullPath: {0}".format(micrographPyarchPath))
+                self.info("correctedDoseMicrographFullPath: {0}".format(correctedDoseMicrographPyarchPath))
+                self.info("micrographSnapshotFullPath: {0}".format(micrographSnapshotPyarchPath))
+                self.info("logFilePath: {0}".format(logFilePyarchPath))
+                motionCorrectionObject = self.client.service.addMotionCorrection(proposal=self.proposalCode+self.proposalNumber, 
+                                                movieFullPath=movieFullPath,
+                                                firstFrame=firstFrame,
+                                                lastFrame=lastFrame,
+                                                dosePerFrame=dosePerFrame,
+                                                doseWeight=doseWeight,
+                                                totalMotion=totalMotion,
+                                                averageMotionPerFrame=averageMotionPerFrame,
+                                                driftPlotFullPath=driftPlotFullPath,
+                                                micrographFullPath=micrographFullPath,
+                                                correctedDoseMicrographFullPath=correctedDoseMicrographFullPath,
+                                                micrographSnapshotFullPath=micrographSnapshotFullPath,
+                                                logFileFullPath=logFilePyarchPath)
+                self.info(motionCorrectionObject)
 
     def uploadCTFMicrographs(self, prot, allParams):
         self.info("ESRF ISPyB upload ctf micrographs:")
