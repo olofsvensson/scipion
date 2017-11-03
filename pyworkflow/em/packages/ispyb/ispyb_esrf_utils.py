@@ -30,6 +30,8 @@ import os
 import re
 import glob
 import time
+import socket
+import shutil
 import pprint
 import xml.etree.ElementTree
 
@@ -173,8 +175,8 @@ class ISPyB_ESRF_Utils(object):
     @ staticmethod
     def getCtfMetaData(workingDir, mrcFilePath):
         dictResults = {
-            "spectraImageThumbnailPath": None,
-            "spectraImagePath": None,
+            "spectraImageSnapshotFullPath": None,
+            "spectraImageFullPath": None,
             "defocusU": None,
             "defocusV": None,
             "angle": None,
@@ -187,13 +189,13 @@ class ISPyB_ESRF_Utils(object):
         mrcFileName = os.path.splitext(os.path.basename(mrcFilePath))[0]
         mrcDirectory = os.path.join(workingDir, "extra", mrcFileName)
         if os.path.exists(mrcDirectory):
-            spectraImagePath = os.path.join(mrcDirectory, "ctfEstimation.mrc")
-            if os.path.exists(spectraImagePath):
-                dictResults["spectraImagePath"] = spectraImagePath
-                spectraImageThumbnailPath = os.path.join(mrcDirectory, "ctfEstimation.jpeg")
-                os.system("bimg {0} {1}".format(spectraImagePath, spectraImageThumbnailPath))
-                if os.path.exists(spectraImageThumbnailPath):
-                    dictResults["spectraImageThumbnailPath"] = spectraImageThumbnailPath
+            spectraImageFullPath = os.path.join(mrcDirectory, "ctfEstimation.mrc")
+            if os.path.exists(spectraImageFullPath):
+                dictResults["spectraImageFullPath"] = spectraImageFullPath
+                spectraImageSnapshotFullPath = os.path.join(mrcDirectory, "ctfEstimation.jpeg")
+                os.system("bimg {0} {1}".format(spectraImageFullPath, spectraImageSnapshotFullPath))
+                if os.path.exists(spectraImageSnapshotFullPath):
+                    dictResults["spectraImageSnapshotFullPath"] = spectraImageSnapshotFullPath
             ctfEstimationPath = os.path.join(mrcDirectory, "ctfEstimation.txt")
             if os.path.exists(ctfEstimationPath):
                 f = open(ctfEstimationPath)
@@ -257,10 +259,17 @@ class ISPyB_ESRF_Utils(object):
             if os.path.exists(timePath):
                 time.sleep(1)
             else:
-                os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
                 pyarchFilePath = os.path.join(timePath, fileName)
-                os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+                if "linsvensson" in socket.gethostname() and os.path.getsize(filePath) < 1e6:
+                    # For the moment, only copy file if smaller than 1 MB
+                    os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
+                    os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+                else:
+                    os.makedirs(timePath, 0755)
+                    shutil.copy(filePath, pyarchFilePath)
                 isDone = True
+        else:
+            pyarchFilePath = filePath
         return pyarchFilePath
         
                 

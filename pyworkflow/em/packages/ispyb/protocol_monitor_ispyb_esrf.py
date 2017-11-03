@@ -315,23 +315,45 @@ class MonitorISPyB_ESRF(Monitor):
         workingDir = os.path.join(self.currentDir, str(prot.workingDir))
         self.info("workingDir: {0}".format(workingDir))
         for ctf in self.iter_updated_set(prot.outputCTF):
-            jpeg = "/data/ctfJpeg"
-            mrcFilePath = ctf.getMicrograph().getFileName()
-            self.info("mrcFilePath: {0}".format(mrcFilePath))
-            dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)
-            self.info("ESRF ISPyB upload align movies:")
-            self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
-            self.info("imageDirectory: {0}".format(self.movieDirectory))
-            self.info("defocusU: {0}".format(dictResults["defocusU"]))
-            self.info("defocusV: {0}".format(dictResults["defocusV"]))
-            self.info("crossCorrelationCoefficient: {0}".format(dictResults["crossCorrelationCoefficient"]))
-            self.info("resolutionLimit: {0}".format(dictResults["resolutionLimit"]))
-            self.info("estimatedBfactor: {0}".format(dictResults["estimatedBfactor"]))
-            self.info("logFilePath: {0}".format(dictResults["logFilePath"]))
-            self.client.service.addCTF(proposal=self.proposalCode+self.proposalNumber, 
-                                       imageDirectory=self.movieDirectory,
-                                       jpeg=jpeg,
-                                       mrc=ctfMrcFilePath,
-                                       outputOne=outputOne,
-                                       outputTwo=outputTwo,
-                                       logFilePath=logFilePath)
+            micrographFullPath = ctf.getMicrograph().getFileName()
+            dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
+            movieNumber = dictFileNameParameters["movieNumber"]
+            if movieNumber in allParams:
+                movieFullPath = allParams[movieNumber]["movieFullPath"]
+                dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, micrographFullPath)
+                spectraImageSnapshotFullPath = dictResults["spectraImageSnapshotFullPath"]
+                spectraImageSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageSnapshotFullPath)
+                spectraImageFullPath = dictResults["spectraImageFullPath"]
+                spectraImagePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageFullPath)
+                defocusU = dictResults["defocusU"]
+                defocusV = dictResults["defocusV"]
+                angle = dictResults["angle"]
+                crossCorrelationCoefficient = dictResults["crossCorrelationCoefficient"]
+                resolutionLimit = dictResults["resolutionLimit"]
+                estimatedBfactor = dictResults["estimatedBfactor"]
+                logFilePath = "/data/pyarch/ctfLogFile.txt"
+                self.info("micrographFullPath: {0}".format(micrographFullPath))
+                self.info("ESRF ISPyB upload align movies:")
+                self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
+                self.info("imageDirectory: {0}".format(self.movieDirectory))
+                self.info("defocusU: {0}".format(dictResults["defocusU"]))
+                self.info("defocusV: {0}".format(dictResults["defocusV"]))
+                self.info("crossCorrelationCoefficient: {0}".format(dictResults["crossCorrelationCoefficient"]))
+                self.info("resolutionLimit: {0}".format(dictResults["resolutionLimit"]))
+                self.info("estimatedBfactor: {0}".format(dictResults["estimatedBfactor"]))
+                self.info("spectraImageFullPath: {0}".format(spectraImagePyarchPath))
+                self.info("spectraImageSnapshotFullPath: {0}".format(spectraImageSnapshotPyarchPath))
+                self.info("logFilePath: {0}".format(dictResults["logFilePath"]))
+                ctfObject = self.client.service.addCTF(proposal=self.proposalCode+self.proposalNumber, 
+                                        movieFullPath=movieFullPath,
+                                        spectraImageSnapshotFullPath=spectraImageSnapshotPyarchPath,
+                                        spectraImageFullPath=spectraImagePyarchPath,
+                                        defocusU=defocusU,
+                                        defocusV=defocusV,
+                                        angle=angle,
+                                        crossCorrelationCoefficient=crossCorrelationCoefficient,
+                                        resolutionLimit=resolutionLimit,
+                                        estimatedBfactor=estimatedBfactor,
+                                        logFilePath=logFilePath)
+                self.info(ctfObject)
+
