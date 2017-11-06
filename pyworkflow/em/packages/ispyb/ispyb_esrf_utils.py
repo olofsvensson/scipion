@@ -43,6 +43,7 @@ class ISPyB_ESRF_Utils(object):
         jpeg = None
         mrc = None
         xml = None
+        gridSquareSnapshot = None
         doContinue = True
         currentDirectory = os.path.dirname(movieFilePath)
         movieFileName = os.path.basename(movieFilePath)
@@ -54,26 +55,30 @@ class ISPyB_ESRF_Utils(object):
             #print(listDirectory)
             currentDirectory = os.path.dirname(currentDirectory)
             # Go through all sub directories
-            for root, dirs, files in os.walk(currentDirectory):
-                print("root: ", root)
-                if not root in listDirectory:
-                    for fileName in files:
-                        fileNameWithoutSuffix = os.path.splitext(fileName)
-                        if movieFileName.startswith(fileNameWithoutSuffix):
-                            if fileName.endswith("jpg"):
-                                jpeg = os.path.join(root, fileName)
-                            elif fileName.endswith("mrc"):
-                                mrc = os.path.join(root, fileName)
-                            elif fileName.endswith("xml"):
-                                xml = os.path.join(root, fileName)
-                        if jpeg is not None and mrc is not None and xml is not None:
-                            break
+            for root, dirs, files in os.walk(currentDirectory, followlinks=True):
+                if jpeg is None or mrc is None or xml is None:
+                    if not root in listDirectory:
+                        print("root: ", root)
+                        for fileName in files:
+                            fileNameWithoutSuffix = os.path.splitext(fileName)[0]
+                            if movieFileName.startswith(fileNameWithoutSuffix):
+                                if fileName.endswith("jpg"):
+                                    jpeg = os.path.join(root, fileName)
+                                    # Assume that the grid square thumb nail is one level above
+                                    gridSquareDir = os.path.dirname(os.path.dirname(jpeg))
+                                    listSnapshot = glob.glob(os.path.join(gridSquareDir, "*.jpg"))
+                                    if len(listSnapshot) > 0:
+                                        gridSquareSnapshot = listSnapshot[-1]
+                                elif fileName.endswith("mrc"):
+                                    mrc = os.path.join(root, fileName)
+                                elif fileName.endswith("xml"):
+                                    xml = os.path.join(root, fileName)
                 listDirectory.append(root)
             index += 1
             if index > 4 or (jpeg is not None and mrc is not None and xml is not None):
                 doContinue = False
             
-        return jpeg, mrc, xml
+        return jpeg, mrc, xml, gridSquareSnapshot
 
 
     @staticmethod
@@ -255,20 +260,20 @@ class ISPyB_ESRF_Utils(object):
         pyarchFilePath = None
         while not isDone:
             timePath = os.path.join(datePath, time.strftime("%H%M%S", time.localtime(time.time())))
-            print(timePath)
             if os.path.exists(timePath):
                 time.sleep(1)
             else:
                 pyarchFilePath = os.path.join(timePath, fileName)
-                if "linsvensson" in socket.gethostname() and os.path.getsize(filePath) < 1e6:
-                    # For the moment, only copy file if smaller than 1 MB
-                    os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
-                    os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+                if "linsvensson" in socket.gethostname(): 
+                    if os.path.getsize(filePath) < 1e6:
+                        # For the moment, only copy file if smaller than 1 MB
+                        os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
+                        os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
                 else:
                     os.makedirs(timePath, 0755)
                     shutil.copy(filePath, pyarchFilePath)
                 isDone = True
-        else:
+        if pyarchFilePath is None or not os.path.exists(pyarchFilePath):
             pyarchFilePath = filePath
         return pyarchFilePath
         

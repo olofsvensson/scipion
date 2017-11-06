@@ -136,7 +136,7 @@ if __name__ == "__main__":
 	resolutionLimit = "4"
 	estimatedBfactor = "5"
 	logFilePath = "/data/pyarch/ctfLogFile.txt"
-	if False:
+	if True:
 		ctfObject = client.service.addCTF(proposal=proposalCode+proposalNumber, 
 							movieFullPath=movieFullPath,
 							spectraImageSnapshotFullPath=spectraImageSnapshotFullPath,

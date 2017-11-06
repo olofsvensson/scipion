@@ -43,12 +43,12 @@ class Test(unittest.TestCase):
         
         
 
-    def tes_getMovieJpegMrcXml(self):
-        movieFullPath = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
-        jpeg, mrc, xml =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
-        print(jpeg, mrc, xml)
+    def test_getMovieJpegMrcXml(self):
+        movieFullPath = "/data/visitor/mx415/cm01/20171103/RAW_DATA/test4/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/FoilHole_19150716_Data_19148705_19148706_20170619_1744-0055.mrc"
+        jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
+        print(jpeg, mrc, xml, gridSquareThumbNail)
 
-    def test_getAlignMoviesPngLogFilePath(self):
+    def tes_getAlignMoviesPngLogFilePath(self):
         mrcFilePath = "/users/svensson/ScipionUserData/projects/TestPipeLine/Runs/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
         dictResult = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
         pprint.pprint(dictResult)
