@@ -40,44 +40,35 @@ class ISPyB_ESRF_Utils(object):
 
     @staticmethod
     def getMovieJpegMrcXml(movieFilePath):
+        movieFileName = os.path.basename(movieFilePath)
         jpeg = None
         mrc = None
         xml = None
         gridSquareSnapshot = None
         doContinue = True
-        currentDirectory = os.path.dirname(movieFilePath)
-        movieFileName = os.path.basename(movieFilePath)
-        listDirectory = []
-        index = 0
-        while doContinue:
-            # Go up one directory level
-            listDirectory.append(currentDirectory)
-            #print(listDirectory)
-            currentDirectory = os.path.dirname(currentDirectory)
-            # Go through all sub directories
-            for root, dirs, files in os.walk(currentDirectory, followlinks=True):
-                if jpeg is None or mrc is None or xml is None:
-                    if not root in listDirectory:
-                        print("root: ", root)
-                        for fileName in files:
-                            fileNameWithoutSuffix = os.path.splitext(fileName)[0]
-                            if movieFileName.startswith(fileNameWithoutSuffix):
-                                if fileName.endswith("jpg"):
-                                    jpeg = os.path.join(root, fileName)
-                                    # Assume that the grid square thumb nail is one level above
-                                    gridSquareDir = os.path.dirname(os.path.dirname(jpeg))
-                                    listSnapshot = glob.glob(os.path.join(gridSquareDir, "*.jpg"))
-                                    if len(listSnapshot) > 0:
-                                        gridSquareSnapshot = listSnapshot[-1]
-                                elif fileName.endswith("mrc"):
-                                    mrc = os.path.join(root, fileName)
-                                elif fileName.endswith("xml"):
-                                    xml = os.path.join(root, fileName)
-                listDirectory.append(root)
-            index += 1
-            if index > 4 or (jpeg is not None and mrc is not None and xml is not None):
-                doContinue = False
-            
+        movieDirectory = os.path.dirname(movieFilePath)
+        imageDiscDirectory = os.path.dirname(movieDirectory)
+        imageDiscName = os.path.basename(movieDirectory)
+        runName = os.path.basename(imageDiscDirectory)
+        topDir = os.path.dirname(os.path.dirname(imageDiscDirectory))
+        gridSquareTopDataDir = os.path.join(topDir, "CWAT_ESRF_MicroscopePC", runName, imageDiscName)
+        for gridSquareDir in glob.glob(os.path.join(gridSquareTopDataDir, "*")):
+            dataDir = os.path.join(gridSquareDir, "Data")
+            if os.path.exists(dataDir):
+                listMrcFiles = glob.glob(os.path.join(dataDir, "*.mrc"))
+                for mrcFile in listMrcFiles:
+                    filePathWithoutSuffix = os.path.splitext(mrcFile)[0]
+                    fileNameWithoutSuffix = os.path.basename(filePathWithoutSuffix)
+                    #print(fileNameWithoutSuffix)
+                    if movieFileName.startswith(fileNameWithoutSuffix):
+                        mrc = mrcFile
+                        jpeg = filePathWithoutSuffix + ".jpg"
+                        xml = filePathWithoutSuffix + ".xml"
+                        # Assume that the grid square thumb nail is one level above
+                        listSnapshot = glob.glob(os.path.join(gridSquareDir, "*.jpg"))
+                        if len(listSnapshot) > 0:
+                            gridSquareSnapshot = listSnapshot[-1]
+                        break
         return jpeg, mrc, xml, gridSquareSnapshot
 
 

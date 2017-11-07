@@ -129,9 +129,10 @@ class MonitorISPyB_ESRF(Monitor):
         self.movieDirectory = None
         self.currentDir = os.getcwd()
         self.beamlineName = "cm01"
+        self.allParams = collections.OrderedDict()
 
     def step(self):
-        self.info("MonitorISPyB: only one step")
+        self.info("MonitorISPyB: start step")
 
         prot = self.protocol
 
@@ -144,28 +145,19 @@ class MonitorISPyB_ESRF(Monitor):
 
         nodes = g.getRoot().iterChildsBreadth()
 
-        allParams = collections.OrderedDict()
-
         for n in nodes:
             prot = n.run
             self.info("Protocol name: {0}".format(prot.getRunName()))
             self.info("Protocol: {0}".format(type(prot)))
 
             if isinstance(prot, ProtImportMovies):
-                self.uploadImportMovies(prot, allParams)
+                self.uploadImportMovies(prot)
             elif isinstance(prot, ProtAlignMovies) and hasattr(prot, 'outputMicrographs'):
-                self.uploadAlignMovies(prot, allParams)
-            elif isinstance(prot, ProtCTFMicrographs):
-                self.uploadCTFMicrographs(prot, allParams)
+                self.uploadAlignMovies(prot)
+            elif isinstance(prot, ProtCTFMicrographs) and hasattr(prot, 'outputCTF'):
+                self.uploadCTFMicrographs(prot)
 
-        for itemId, params in allParams.iteritems():
-            self.info("Params: {0}".format(params))
-#             ispybId = proxy.sendMovieParams(params)
-            # Use -1 as a trick when ispyb is not really used and id is None
-#             self.allIds[itemId] = ispybId or -1
-
-        self.info("Closing proxy")
-#         proxy.close()
+        self.info("MonitorISPyB: end step")
 
         return False
 
@@ -177,119 +169,118 @@ class MonitorISPyB_ESRF(Monitor):
         objSet.close()
 
 
-    def uploadImportMovies(self, prot, allParams):
-        for movie in self.iter_updated_set(prot.outputMovies):
-            movieFilePath = movie.getFileName()
-            movieId = movie.getObjId()
-            
-            self.info("ESRF ISPyB upload import movies:")
-            for movieFullPath in prot.getMatchFiles():
-                listMovieFullPath = [ allParams[movieNumber]["movieFullPath"] for movieNumber in allParams if "movieFullPath" in allParams[movieNumber]]
-                self.info("listMovieFullPath: {0}".format(listMovieFullPath))
-                if not movieFullPath in listMovieFullPath:                
-                    self.info("movieFullPath: {0}".format(movieFullPath))
-                    dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
-                    self.movieDirectory = dictFileNameParameters["directory"]
-                    prefix = dictFileNameParameters["prefix"]   
-                    id1 = dictFileNameParameters["id1"]   
-                    id2 = dictFileNameParameters["id2"]   
-                    id3 = dictFileNameParameters["id3"]   
-                    date = dictFileNameParameters["date"]   
-                    hour = dictFileNameParameters["hour"]   
-                    movieNumber = dictFileNameParameters["movieNumber"]   
-                    suffix = dictFileNameParameters["suffix"]               
-                    
-                    self.movieDirectory = os.path.dirname(movieFullPath)
-                    
-                    micrographSnapshotFullPath, micrographFullPath, xmlMetaDataFullPath, gridSquareSnapshotFullPath = \
-                       ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
-        
-                    self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
-                    self.info("sampleAcronym: {0}".format(self.sampleAcronym))
-                    self.info("imageDirectory: {0}".format(self.movieDirectory))
-                    self.info("micrographSnapshotFullPath: {0}".format(micrographSnapshotFullPath))
-        
-                    micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
-                    self.info("micrographSnapshotPyarchPath: {0}".format(micrographSnapshotPyarchPath))
-                    micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
-                    self.info("micrographPyarchPath: {0}".format(micrographPyarchPath))
-                    xmlMetaDataPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(xmlMetaDataFullPath)
-                    self.info("xmlMetaDataPyarchPath: {0}".format(xmlMetaDataPyarchPath))
-                    gridSquareSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(gridSquareSnapshotFullPath)
-                    self.info("gridSquareSnapshotPyarchPath: {0}".format(gridSquareSnapshotPyarchPath))
-                    
-                    dictMetaData = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
-                    voltage = dictMetaData["accelerationVoltage"]
-                    magnification = dictMetaData["nominalMagnification"]
-                    imagesCount = dictMetaData["numberOffractions"]
-                    positionX = dictMetaData["positionX"]
-                    positionY = dictMetaData["positionY"]
-                    dosePerImage = dictMetaData["dose"]
-                    sphericalAberration = None
-                    amplitudeContrast = None
-                    scannedPixelSize = None
-        
-                    self.info("voltage: {0}".format(voltage))
-                    self.info("sphericalAberration: {0}".format(sphericalAberration))
-                    self.info("amplitudeContrast: {0}".format(amplitudeContrast))
-                    self.info("magnification: {0}".format(magnification))
-                    self.info("scannedPixelSize: {0}".format(scannedPixelSize))
-                    self.info("imagesCount: {0}".format(imagesCount))
-                    self.info("dosePerImage: {0}".format(dosePerImage))
-                    self.info("positionX: {0}".format(positionX))
-                    self.info("positionY: {0}".format(positionY))
-                    self.info("beamlineName: {0}".format(self.beamlineName))
-                    
-                    
-                    movieObject = self.client.service.addMovie(proposal=self.proposalCode+self.proposalNumber, 
-                                    sampleAcronym=self.sampleAcronym, 
-                                    movieDirectory=self.movieDirectory,
-                                    movieFullPath=movieFullPath,
-                                    movieNumber=movieNumber,
-                                    micrographFullPath=micrographPyarchPath,
-                                    micrographSnapshotFullPath=micrographSnapshotPyarchPath,
-                                    xmlMetaDataFullPath=xmlMetaDataPyarchPath,
-                                    voltage=voltage,
-                                    sphericalAberration=sphericalAberration,
-                                    amplitudeContrast=amplitudeContrast,
-                                    magnification=magnification,
-                                    scannedPixelSize=scannedPixelSize,
-                                    imagesCount=imagesCount,
-                                    dosePerImage=dosePerImage,
-                                    positionX=positionX,
-                                    positionY=positionY,
-                                    beamlineName=self.beamlineName,
-                                    gridSquareSnapshotFullPath=gridSquareSnapshotPyarchPath,
-                                    )
-                    if movieObject is not None:
-                        self.info("movieObject: {0}".format(pprint.pformat(dict(movieObject))))
-                        movieId = movieObject.movieId
-                    else:
-                        self.info("ERROR: movieObject is None!")
-        
-                    allParams[movieNumber] = {
-                        "movieFullPath": movieFullPath,
-                        "prefix": prefix,   
-                        "id1": id1,   
-                        "id2": id2,   
-                        "id3": id3,   
-                        "date": date,   
-                        "hour": hour,   
-                        "movieId": movieId,   
-                        "suffix": suffix,               
-                     }
-                self.info("allParams: {0}".format(allParams))
+    def uploadImportMovies(self, prot):
+        self.info("ESRF ISPyB upload import movies:")
+        self.info("prot.getMatchFiles(): {0}".format(prot.getMatchFiles()))
+        for movieFullPath in prot.getMatchFiles():
+            listMovieFullPath = [ self.allParams[movieNumber]["movieFullPath"] for movieNumber in self.allParams if "movieFullPath" in self.allParams[movieNumber]]
+            self.info("listMovieFullPath: {0}".format(listMovieFullPath))
+            if not movieFullPath in listMovieFullPath:                
+                self.info("movieFullPath: {0}".format(movieFullPath))
+                dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
+                self.movieDirectory = dictFileNameParameters["directory"]
+                prefix = dictFileNameParameters["prefix"]   
+                id1 = dictFileNameParameters["id1"]   
+                id2 = dictFileNameParameters["id2"]   
+                id3 = dictFileNameParameters["id3"]   
+                date = dictFileNameParameters["date"]   
+                hour = dictFileNameParameters["hour"]   
+                movieNumber = dictFileNameParameters["movieNumber"]   
+                self.info("movieNumber: {0}".format(movieNumber))
+                suffix = dictFileNameParameters["suffix"]               
+                
+                self.movieDirectory = os.path.dirname(movieFullPath)
+                
+                micrographSnapshotFullPath, micrographFullPath, xmlMetaDataFullPath, gridSquareSnapshotFullPath = \
+                   ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
+    
+                self.info("proposal: {0}".format(self.proposalCode+self.proposalNumber))
+                self.info("sampleAcronym: {0}".format(self.sampleAcronym))
+                self.info("imageDirectory: {0}".format(self.movieDirectory))
+                self.info("micrographSnapshotFullPath: {0}".format(micrographSnapshotFullPath))
+    
+                micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
+                self.info("micrographSnapshotPyarchPath: {0}".format(micrographSnapshotPyarchPath))
+                micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
+                self.info("micrographPyarchPath: {0}".format(micrographPyarchPath))
+                xmlMetaDataPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(xmlMetaDataFullPath)
+                self.info("xmlMetaDataPyarchPath: {0}".format(xmlMetaDataPyarchPath))
+                gridSquareSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(gridSquareSnapshotFullPath)
+                self.info("gridSquareSnapshotPyarchPath: {0}".format(gridSquareSnapshotPyarchPath))
+                
+                dictMetaData = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
+                voltage = dictMetaData["accelerationVoltage"]
+                magnification = dictMetaData["nominalMagnification"]
+                imagesCount = dictMetaData["numberOffractions"]
+                positionX = dictMetaData["positionX"]
+                positionY = dictMetaData["positionY"]
+                dosePerImage = dictMetaData["dose"]
+                sphericalAberration = None
+                amplitudeContrast = None
+                scannedPixelSize = None
+    
+                self.info("voltage: {0}".format(voltage))
+                self.info("sphericalAberration: {0}".format(sphericalAberration))
+                self.info("amplitudeContrast: {0}".format(amplitudeContrast))
+                self.info("magnification: {0}".format(magnification))
+                self.info("scannedPixelSize: {0}".format(scannedPixelSize))
+                self.info("imagesCount: {0}".format(imagesCount))
+                self.info("dosePerImage: {0}".format(dosePerImage))
+                self.info("positionX: {0}".format(positionX))
+                self.info("positionY: {0}".format(positionY))
+                self.info("beamlineName: {0}".format(self.beamlineName))
+                
+                
+                movieObject = self.client.service.addMovie(proposal=self.proposalCode+self.proposalNumber, 
+                                sampleAcronym=self.sampleAcronym, 
+                                movieDirectory=self.movieDirectory,
+                                movieFullPath=movieFullPath,
+                                movieNumber=movieNumber,
+                                micrographFullPath=micrographPyarchPath,
+                                micrographSnapshotFullPath=micrographSnapshotPyarchPath,
+                                xmlMetaDataFullPath=xmlMetaDataPyarchPath,
+                                voltage=voltage,
+                                sphericalAberration=sphericalAberration,
+                                amplitudeContrast=amplitudeContrast,
+                                magnification=magnification,
+                                scannedPixelSize=scannedPixelSize,
+                                imagesCount=imagesCount,
+                                dosePerImage=dosePerImage,
+                                positionX=positionX,
+                                positionY=positionY,
+                                beamlineName=self.beamlineName,
+                                gridSquareSnapshotFullPath=gridSquareSnapshotPyarchPath,
+                                )
+                if movieObject is not None:
+                    self.info("movieObject: {0}".format(pprint.pformat(dict(movieObject))))
+                    movieId = movieObject.movieId
+                else:
+                    self.info("ERROR: movieObject is None!")
+                    movieId = None
+    
+                self.allParams[movieNumber] = {
+                    "movieFullPath": movieFullPath,
+                    "prefix": prefix,   
+                    "id1": id1,   
+                    "id2": id2,   
+                    "id3": id3,   
+                    "date": date,   
+                    "hour": hour,   
+                    "movieId": movieId,   
+                    "suffix": suffix,               
+                 }
+            self.info("self.allParams: {0}".format(self.allParams))
 
-    def uploadAlignMovies(self, prot, allParams):
-        self.info("allParams: {0}".format(dict(allParams)))
+    def uploadAlignMovies(self, prot):
+        self.info("ESRF ISPyB upload align movies:")
         self.info("prot.outputMicrographs: {0}".format(prot.outputMicrographs))
         for micrograph in self.iter_updated_set(prot.outputMicrographs):
             micrographFullPath = os.path.join(self.currentDir, micrograph.getFileName())
             self.info("micrographFullPath: {0}".format(micrographFullPath))
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
             movieNumber = dictFileNameParameters["movieNumber"]
-            if movieNumber in allParams:
-                movieFullPath = allParams[movieNumber]["movieFullPath"]
+            if movieNumber in self.allParams and not "motionCorrectionId" in self.allParams[movieNumber]:
+                movieFullPath = self.allParams[movieNumber]["movieFullPath"]
                 dictResult = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(micrographFullPath)
                 driftPlotFullPath = dictResult["globalShiftPng"]
                 if "doseWeightMrc" in dictResult:
@@ -334,24 +325,29 @@ class MonitorISPyB_ESRF(Monitor):
                                                 doseWeight=doseWeight,
                                                 totalMotion=totalMotion,
                                                 averageMotionPerFrame=averageMotionPerFrame,
-                                                driftPlotFullPath=driftPlotFullPath,
-                                                micrographFullPath=micrographFullPath,
-                                                correctedDoseMicrographFullPath=correctedDoseMicrographFullPath,
-                                                micrographSnapshotFullPath=micrographSnapshotFullPath,
+                                                driftPlotFullPath=driftPlotPyarchPath,
+                                                micrographFullPath=micrographPyarchPath,
+                                                correctedDoseMicrographFullPath=correctedDoseMicrographPyarchPath,
+                                                micrographSnapshotFullPath=micrographSnapshotPyarchPath,
                                                 logFileFullPath=logFilePyarchPath)
-                self.info(motionCorrectionObject)
+                if motionCorrectionObject is not None:
+                    self.info("motionCorrectionObject: {0}".format(pprint.pformat(dict(motionCorrectionObject))))
+                    motionCorrectionId = motionCorrectionObject.motionCorrectionId
+                else:
+                    self.info("ERROR: motionCorrectionObject is None!")
+                    motionCorrectionId = None
+                self.allParams[movieNumber]["motionCorrectionId"] = motionCorrectionId
 
-    def uploadCTFMicrographs(self, prot, allParams):
+    def uploadCTFMicrographs(self, prot):
         self.info("ESRF ISPyB upload ctf micrographs:")
-        self.info("allParams: {0}".format(dict(allParams)))
+        self.info("prot.outputCTF: {0}".format(prot.outputCTF))
         workingDir = os.path.join(self.currentDir, str(prot.workingDir))
-        self.info("workingDir: {0}".format(workingDir))
         for ctf in self.iter_updated_set(prot.outputCTF):
             micrographFullPath = ctf.getMicrograph().getFileName()
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
             movieNumber = dictFileNameParameters["movieNumber"]
-            if movieNumber in allParams:
-                movieFullPath = allParams[movieNumber]["movieFullPath"]
+            if movieNumber in self.allParams and not "CTFid" in self.allParams[movieNumber]:
+                movieFullPath = self.allParams[movieNumber]["movieFullPath"]
                 dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, micrographFullPath)
                 spectraImageSnapshotFullPath = dictResults["spectraImageSnapshotFullPath"]
                 spectraImageSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageSnapshotFullPath)
@@ -387,5 +383,11 @@ class MonitorISPyB_ESRF(Monitor):
                                         resolutionLimit=resolutionLimit,
                                         estimatedBfactor=estimatedBfactor,
                                         logFilePath=logFilePath)
-                self.info(ctfObject)
+                if ctfObject is not None:
+                    self.info("ctfObject: {0}".format(pprint.pformat(dict(ctfObject))))
+                    CTFid = ctfObject.CTFid
+                else:
+                    self.info("ERROR: ctfObject is None!")
+                    CTFid = None
+                self.allParams[movieNumber]["CTFid"] = CTFid
 
