@@ -47,7 +47,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.em.protocol import ProtMonitor, Monitor, PrintNotifier
 from pyworkflow.em.protocol import ProtImportMovies, ProtAlignMovies, ProtCTFMicrographs
-from pyworkflow.protocol import getUpdatedProtocol
+from pyworkflow.protocol import getProtocolFromDb
 
 from ispyb_esrf_utils import ISPyB_ESRF_Utils
 
@@ -132,10 +132,21 @@ class MonitorISPyB_ESRF(Monitor):
         self.beamlineName = "cm01"
         self.allParams = collections.OrderedDict()
 
+    def getUpdatedProtocol(self, protocol):
+        """ Retrieve the updated protocol and close db connections
+            """
+        prot2 = getProtocolFromDb(self.currentDir,
+                                  protocol.getDbPath(),
+                                  protocol.getObjId())
+        # Close DB connections
+        prot2.getProject().closeMapper()
+        prot2.closeMappers()
+        return prot2
+
     def step(self):
         self.info("MonitorISPyB: start step")
-
-        runs = [getUpdatedProtocol(p.get()) for p in self.protocol.inputProtocols] 
+                
+        runs = [self.getUpdatedProtocol(p.get()) for p in self.protocol.inputProtocols] 
         
         g = self.project.getGraphFromRuns(runs)
 
