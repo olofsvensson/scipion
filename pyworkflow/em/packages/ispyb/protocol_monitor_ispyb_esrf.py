@@ -47,6 +47,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.em.protocol import ProtMonitor, Monitor, PrintNotifier
 from pyworkflow.em.protocol import ProtImportMovies, ProtAlignMovies, ProtCTFMicrographs
+from pyworkflow.protocol import getUpdatedProtocol
 
 from ispyb_esrf_utils import ISPyB_ESRF_Utils
 
@@ -134,13 +135,8 @@ class MonitorISPyB_ESRF(Monitor):
     def step(self):
         self.info("MonitorISPyB: start step")
 
-        prot = self.protocol
-
-#         proxy = ISPyBProxy(["prod", "dev", "test"][prot.db.get()],
-#                            experimentParams={'proposal': prot.proposal.get()})
-
-
-        runs = [p.get() for p in self.protocol.inputProtocols]
+        runs = [getUpdatedProtocol(p.get()) for p in self.protocol.inputProtocols] 
+        
         g = self.project.getGraphFromRuns(runs)
 
         nodes = g.getRoot().iterChildsBreadth()
