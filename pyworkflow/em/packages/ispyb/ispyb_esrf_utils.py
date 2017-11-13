@@ -49,9 +49,15 @@ class ISPyB_ESRF_Utils(object):
         movieDirectory = os.path.dirname(movieFilePath)
         imageDiscDirectory = os.path.dirname(movieDirectory)
         imageDiscName = os.path.basename(movieDirectory)
-        runName = os.path.basename(imageDiscDirectory)
-        topDir = os.path.dirname(os.path.dirname(imageDiscDirectory))
-        gridSquareTopDataDir = os.path.join(topDir, "CWAT_ESRF_MicroscopePC", runName, imageDiscName)
+        if imageDiscName == "Data":
+            gridSquareDirectory = imageDiscDirectory
+            gridSquareName = os.path.basename(gridSquareDirectory)
+            imageDiscDirectory = os.path.dirname(gridSquareDirectory)
+            imageDiscName = os.path.basename(imageDiscDirectory)
+        runDirectory = os.path.dirname(imageDiscDirectory)
+        runName = os.path.basename(runDirectory)
+        topDir = os.path.dirname(runDirectory)
+        gridSquareTopDataDir = os.path.join(topDir, "supervisor_20171109_095814", runName, imageDiscName)
         for gridSquareDir in glob.glob(os.path.join(gridSquareTopDataDir, "*")):
             dataDir = os.path.join(gridSquareDir, "Data")
             if os.path.exists(dataDir):
@@ -77,17 +83,21 @@ class ISPyB_ESRF_Utils(object):
         dictResult = {}
         # Locate png file in same directory
         mrcDirectory = os.path.dirname(mrcFilePath)
+        dictMrcFile = ISPyB_ESRF_Utils.getMovieFileNameParameters(mrcFilePath)
+        mrcMovieNumber = dictMrcFile["movieNumber"]
         listPng = glob.glob(os.path.join(mrcDirectory, "*.png"))
         for pngFile in listPng:
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(pngFile)
-            if dictFileNameParameters["extra"] == "_global_shifts":
+            movieNumber = dictFileNameParameters["movieNumber"]
+            if dictFileNameParameters["extra"] == "_global_shifts" and mrcMovieNumber == movieNumber:
                 dictResult["globalShiftPng"] = pngFile
-            elif dictFileNameParameters["extra"] == "_thumbnail":
+            elif dictFileNameParameters["extra"] == "_thumbnail" and mrcMovieNumber == movieNumber:
                 dictResult["thumbnailPng"] = pngFile
         listMrc = glob.glob(os.path.join(mrcDirectory, "*.mrc"))
         for mrcFile in listMrc:
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(mrcFile)
-            if "DW" in dictFileNameParameters["extra"]:
+            movieNumber = dictFileNameParameters["movieNumber"]
+            if "DW" in dictFileNameParameters["extra"] and mrcMovieNumber == movieNumber:
                 dictResult["doseWeightMrc"] = mrcFile            
         # Find log file
         dictResult["logFileFullPath"] = os.path.join(os.path.dirname(mrcDirectory), "logs", "run.log")
@@ -208,7 +218,6 @@ class ISPyB_ESRF_Utils(object):
                         dictResults["crossCorrelationCoefficient"] = listValues[3]
                     elif "Resolution limit" in lines[index]:
                         listValues = lines[index].split()
-                        print(listValues)
                         dictResults["resolutionLimit"] = listValues[-2]
                     elif "Estimated Bfactor" in lines[index]:
                         listValues = lines[index].split()
@@ -240,32 +249,93 @@ class ISPyB_ESRF_Utils(object):
         return dictResult
 
     @ staticmethod
-    def copyToPyarchPath(filePath):
-        # Test path:
-        testPath = "/data/pyarch/2017/cm01/test"
-        # Add date
-        datePath = os.path.join(testPath, time.strftime("%Y%m%d", time.localtime(time.time())))
-        # Loop until done
-        isDone = False
-        fileName = os.path.basename(filePath)
+    def getPyarchFilePath(workingDir):
+        """
+        This method translates from a "visitor" path to a "pyarch" path:
+        /data/visitor/mx415/id14eh1/20100209 -> /data/pyarch/2010/id14eh1/mx415/20100209
+        """
         pyarchFilePath = None
-        while not isDone:
-            timePath = os.path.join(datePath, time.strftime("%H%M%S", time.localtime(time.time())))
-            if os.path.exists(timePath):
-                time.sleep(1)
+        list_directory = workingDir.split(os.sep)
+        list_beamline = ["cm01"]
+        # Check that we have at least four levels of directories:
+        if (len(list_directory) > 5):
+            topDirectory = list_directory[ 1 ]
+            secondDirectory = list_directory[ 2 ]
+            proposal = None
+            beamline = None
+            year = list_directory[ 5 ][0:4]
+            
+            if topDirectory == "mntdirect" and secondDirectory == "_data_visitor":
+                proposal = list_directory[ 3 ]
+                beamline = list_directory[ 4 ]
+                listOfRemainingDirectories = list_directory[ 5: ]
+
+            elif topDirectory == "mntdirect" and secondDirectory == "_data_cm01_inhouse":
+                proposal = list_directory[ 3 ]
+                beamline = list_directory[ 4 ]
+                listOfRemainingDirectories = list_directory[ 5: ]
+    
+            elif topDirectory == "data" and secondDirectory == "visitor":
+                proposal = list_directory[ 3 ]
+                beamline = list_directory[ 4 ]
+                listOfRemainingDirectories = list_directory[ 5: ]
+    
+            elif topDirectory == "data" and secondDirectory in list_beamline:
+                beamline = secondDirectory
+                proposal = list_directory[ 4 ]
+                listOfRemainingDirectories = list_directory[ 5: ]
+    
+            if ((proposal != None) and
+                (beamline != None)):
+                pyarchFilePath = os.path.join(os.sep, "data")
+                pyarchFilePath = os.path.join(pyarchFilePath, "pyarch")
+                pyarchFilePath = os.path.join(pyarchFilePath, year)
+                pyarchFilePath = os.path.join(pyarchFilePath, beamline)
+                pyarchFilePath = os.path.join(pyarchFilePath, proposal)
+                for directory in listOfRemainingDirectories:
+                    pyarchFilePath = os.path.join(pyarchFilePath, directory)
+    
+        if (pyarchFilePath is None):
+            print("ERROR! Directory path not converted for pyarch: %s" % workingDir)
+        return pyarchFilePath
+
+    @ staticmethod
+    def copyToPyarchPath(filePath):
+        pyarchFilePath = None
+        if os.path.exists(filePath):
+            # Check if we have a "standard" ESRF data path
+            if "RAW_DATA" in filePath or "PROCESSED_DATA" in filePath:
+                pyarchFilePath = ISPyB_ESRF_Utils.getPyarchFilePath(filePath)
+                pyarchFileDir = os.path.dirname(pyarchFilePath)
+                if not os.path.exists(pyarchFileDir):
+                    os.makedirs(pyarchFileDir, 0755)
+                shutil.copy(filePath, pyarchFilePath)
             else:
-                pyarchFilePath = os.path.join(timePath, fileName)
-                if "linsvensson" in socket.gethostname(): 
-                    if os.path.getsize(filePath) < 1e6:
-                        # For the moment, only copy file if smaller than 1 MB
-                        os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
-                        os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
-                else:
-                    os.makedirs(timePath, 0755)
-                    shutil.copy(filePath, pyarchFilePath)
-                isDone = True
-        if pyarchFilePath is None or not os.path.exists(pyarchFilePath):
-            pyarchFilePath = filePath
+                # Test path:
+                testPath = "/data/pyarch/2017/cm01/test"
+                # Add date
+                datePath = os.path.join(testPath, time.strftime("%Y%m%d", time.localtime(time.time())))
+                # Loop until done
+                isDone = False
+                fileName = os.path.basename(filePath)
+                pyarchFilePath = None
+                while not isDone:
+                    timePath = os.path.join(datePath, time.strftime("%H%M%S", time.localtime(time.time())))
+                    if os.path.exists(timePath):
+                        time.sleep(1)
+                    else:
+                        pyarchFilePath = os.path.join(timePath, fileName)
+                        if "linsvensson" in socket.gethostname(): 
+                            if os.path.getsize(filePath) < 1e6:
+                                # For the moment, only copy file if smaller than 1 MB
+                                os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
+                                os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+                        else:
+                            os.makedirs(timePath, 0755)
+                            shutil.copy(filePath, pyarchFilePath)
+                        isDone = True
+            if pyarchFilePath is None or not os.path.exists(pyarchFilePath):
+                pyarchFilePath = filePath
         return pyarchFilePath
         
                 

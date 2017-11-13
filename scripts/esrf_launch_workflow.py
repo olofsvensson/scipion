@@ -40,6 +40,7 @@ def usage(error):
         dataDirectory="folder" location of raw data (movie files)
         filesPattern="pattern" template for movie files
         name="project name"
+        sampleAcronym="Sample acronym name"
         This script will create and run a project 
     """ % error
     sys.exit(1)
@@ -47,12 +48,14 @@ def usage(error):
 
 n = len(sys.argv)
 
-if n != 4:
+if n != 6:
     usage("Incorrect number of input parameters")
 
 dataDirectory = sys.argv[1]
 filesPattern = sys.argv[2]
 projName = sys.argv[3]
+proteinAcronym = sys.argv[4]
+sampleAcronym = sys.argv[5]
 
 path = os.path.join(os.environ['SCIPION_HOME'], 'pyworkflow', 'gui', 'no-tkinter')
 sys.path.insert(1, path)
@@ -93,7 +96,7 @@ jsonString = """[
         "dosePerFrame": 1.0,
         "gainFile": null,
         "darkFile": null,
-        "dataStreaming": false,
+        "dataStreaming": true,
         "timeout": 7200,
         "fileTimeout": 30,
         "inputIndividualFrames": false,
@@ -194,9 +197,11 @@ jsonString = """[
         "inputProtocols": ["2", "77", "195"],
         "samplingInterval": 30,
         "proposal": "mx415",
+        "proteinAcronym": "%s",
+        "sampleAcronym": "%s",
         "db": 1
     }
-]""" % (dataDirectory, filesPattern)
+]""" % (dataDirectory, filesPattern, proteinAcronym, sampleAcronym)
 
 # Write json file
 fd, jsonFile = tempfile.mkstemp(suffix=".json", prefix="scipion_workflow_")
