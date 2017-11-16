@@ -52,6 +52,9 @@ from pyworkflow.protocol import getProtocolFromDb
 
 from ispyb_esrf_utils import ISPyB_ESRF_Utils
 
+from ESRFMetadataManagerClient import CryoEMMetadataClient
+
+
 class ProtMonitorISPyB_ESRF(ProtMonitor):
     """ 
     Monitor to communicated with ISPyB system at ESRF.
@@ -88,6 +91,9 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
 
     #--------------------------- STEPS functions -------------------------------
     def monitorStep(self):
+        # Metadata
+        cryoEMMetadataClient = CryoEMMetadataClient()
+        
         config = ConfigParser.ConfigParser()
         credentialsConfig = ConfigParser.ConfigParser()
     
@@ -99,6 +105,8 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
         username = str(credentialsConfig.get('Credential', 'user'))
         password = str(credentialsConfig.get('Credential', 'password'))
         url = str(config.get('Connection', 'url'))
+        listEmailReceivers = str(config.get('Email', 'receivers'))
+        emailReplyTo = str(config.get('Email', 'replyTo'))
     
         # Authentication
         httpAuthenticatedToolsForAutoprocessingWebService = HttpAuthenticated(username = username, password = password ) 
@@ -277,13 +285,20 @@ class MonitorISPyB_ESRF(Monitor):
                     micrographSnapshotFullPath = dictResult["thumbnailPng"]
                 else:
                     micrographSnapshotFullPath = None
+                dictShift = ISPyB_ESRF_Utils.getShiftData(micrographFullPath)
+                if "totalMotion" in dictShift:
+                    totalMotion = dictShift["totalMotion"]
+                else:
+                    totalMotion = None
+                if "averageMotionPerFrame" in dictShift:
+                    averageMotionPerFrame = dictShift["averageMotionPerFrame"]
+                else:
+                    averageMotionPerFrame = None
                 logFileFullPath = dictResult["logFileFullPath"]
                 firstFrame = 1
                 lastFrame = self.allParams[movieNumber]["imagesCount"]
                 dosePerFrame = self.allParams[movieNumber]["dosePerFrame"]
                 doseWeight = "Dummy value: 2.0"
-                totalMotion = "Dummy value: 3.0"
-                averageMotionPerFrame = "Dummy value: 4.0" 
                 driftPlotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(driftPlotFullPath)
                 micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
                 correctedDoseMicrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(correctedDoseMicrographFullPath)

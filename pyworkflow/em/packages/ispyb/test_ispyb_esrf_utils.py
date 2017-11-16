@@ -54,11 +54,16 @@ class Test(unittest.TestCase):
         jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
         print(jpeg, mrc, xml, gridSquareThumbNail)
  
-    def test_getAlignMoviesPngLogFilePath(self):
+    def tes_getAlignMoviesPngLogFilePath(self):
         mrcFilePath = "/scisoft/pxsoft/data/cryoem/testRunData/20171113/Runs/000056_ProtMotionCorr/extra/FoilHole_9208892_Data_9209286_9209287_20171109_1540-0539_aligned_mic.mrc"
         dictResult = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(mrcFilePath)
         pprint.pprint(dictResult)
         
+    def test_getShiftData(self):
+        mrcFilePath = "/scisoft/pxsoft/data/cryoem/testRunData/20171113/Runs/000056_ProtMotionCorr/extra/FoilHole_9208892_Data_9209286_9209287_20171109_1540-0539_aligned_mic.mrc"
+        dictResult = ISPyB_ESRF_Utils.getShiftData(mrcFilePath)
+        pprint.pprint(dictResult)
+
     def tes_getXmlMetaData(self):
         xmlMetaDataFullPath = "/scisoft/data/cryoem/CWAT_ESRF_MicroscopePC/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150716_Data_19148705_19148706_20170619_1744.xml"
         dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)

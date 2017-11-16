@@ -29,6 +29,7 @@
 import os
 import re
 import glob
+import math
 import time
 import socket
 import shutil
@@ -339,3 +340,50 @@ class ISPyB_ESRF_Utils(object):
         return pyarchFilePath
         
                 
+    @ staticmethod
+    def getShiftData(filePath):
+        dictResults = {}
+        logFile = os.path.join(os.path.dirname(os.path.dirname(filePath)), "logs", "run.stdout")
+        if os.path.exists(logFile):
+            listLines = open(logFile).readlines()
+            index = 0
+            noPoints = 0
+            # Look for mrc file
+            mrcFileName = os.path.basename(filePath)
+            done = False
+            foundMrc = False
+            foundShiftTable = False
+            listXShift = []
+            listYShift = []
+            totalMotion = 0.0
+            while not done:
+                line = listLines[index]
+                if mrcFileName in line:
+                    foundMrc = True
+                if foundMrc:
+                    if "Full-frame alignment shift" in line:
+                        foundShiftTable = True
+                    elif foundShiftTable:
+                        #print(indexMrc, [line])
+                        if len(line) > 1:
+                            listLine = line.split()
+                            #print(listLine)
+                            xShift = float(listLine[5])
+                            yShift = float(listLine[6].strip())
+                            listXShift.append(xShift)
+                            listYShift.append(yShift)
+                            totalMotion += math.sqrt(xShift**2 + yShift**2)
+                            noPoints += 1
+                        else:
+                            foundShiftTable = False
+                            foundMrc = False
+                    
+                    
+                index += 1
+                if index >= len(listLines):
+                    done = True
+            dictResults["noPoints"] = noPoints
+            dictResults["totalMotion"] = round(totalMotion, 1)
+            dictResults["averageMotionPerFrame"] = round(totalMotion / noPoints, 1)
+        return dictResults
+ 
