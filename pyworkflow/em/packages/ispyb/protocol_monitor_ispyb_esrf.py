@@ -33,6 +33,7 @@
 
 import os
 import sys
+import json
 import pprint
 import time
 import collections
@@ -52,8 +53,6 @@ from pyworkflow.protocol import getProtocolFromDb
 
 from ispyb_esrf_utils import ISPyB_ESRF_Utils
 
-from ESRFMetadataManagerClient import CryoEMMetadataClient
-
 
 class ProtMonitorISPyB_ESRF(ProtMonitor):
     """ 
@@ -65,23 +64,28 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
     def _defineParams(self, form):
         ProtMonitor._defineParams(self, form)
 
-        group = form.addGroup('Experiment')
-        group.addParam('proposal', params.StringParam,
+        group1 = form.addGroup('Experiment')
+        group1.addParam('proposal', params.StringParam,
                       label="Proposal",
                       help="Proposal")
 
-        group.addParam('sampleAcronym', params.StringParam,
+        group1.addParam('sampleAcronym', params.StringParam,
                       label="Sample acronym",
                       help="Name of the sample acronym")
 
-        group.addParam('proteinAcronym', params.StringParam,
+        group1.addParam('proteinAcronym', params.StringParam,
                       label="Protein acronym",
                       help="Name of the protein acronym")
 
-        form.addParam('db', params.EnumParam,
-                      choices=["production", "valid"],
-                      label="Database",
-                      help="Select which ISPyB database you want to use.")
+        group2 = form.addGroup('Parameters')
+        group2.addParam('db', params.EnumParam,
+                        choices=["production", "valid"],
+                        label="Database",
+                        help="Select which ISPyB database you want to use.")
+
+        group2.addParam('allParamsJsonFile', params.StringParam,
+                        label="All parameters json file",
+                        help="Json file containing all parameters from processing.")
 
     #--------------------------- INSERT steps functions ------------------------
     def _insertAllSteps(self):
@@ -91,9 +95,6 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
 
     #--------------------------- STEPS functions -------------------------------
     def monitorStep(self):
-        # Metadata
-        cryoEMMetadataClient = CryoEMMetadataClient()
-        
         config = ConfigParser.ConfigParser()
         credentialsConfig = ConfigParser.ConfigParser()
     
@@ -114,7 +115,7 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
               
         monitor = MonitorISPyB_ESRF(self, workingDir=self._getPath(),
                                         samplingInterval=self.samplingInterval.get(),
-                                        monitorTime=100)
+                                        monitorTime=24*60) # 24 H max monitor time
     
         monitor.addNotifier(PrintNotifier())
         monitor.loop()
@@ -140,6 +141,10 @@ class MonitorISPyB_ESRF(Monitor):
         self.currentDir = os.getcwd()
         self.beamlineName = "cm01"
         self.allParams = collections.OrderedDict()
+        if hasattr(protocol, "allParamsJsonFile"):
+            self.allParamsJsonFile = protocol.allParamsJsonFile.get()
+        else:
+            self.allParamsJsonFile = None
 
     def getUpdatedProtocol(self, protocol):
         """ Retrieve the updated protocol and close db connections
@@ -154,27 +159,46 @@ class MonitorISPyB_ESRF(Monitor):
 
     def step(self):
         self.info("MonitorISPyB: start step ------------------------")
-                
+                        
         runs = [self.getUpdatedProtocol(p.get()) for p in self.protocol.inputProtocols] 
         
         g = self.project.getGraphFromRuns(runs)
 
         nodes = g.getRoot().iterChildsBreadth()
 
+        isActiveImportMovies = True
+        isActiveAlignMovies = True
+        isActiveCTFMicrographs = True
+        
         for n in nodes:
             prot = n.run
-            self.info("Protocol name: {0}".format(prot.getRunName()))
+            #self.info("Protocol name: {0}".format(prot.getRunName()))
 
             if isinstance(prot, ProtImportMovies):
                 self.uploadImportMovies(prot)
+                isActiveImportMovies = prot.isActive()
             elif isinstance(prot, ProtAlignMovies) and hasattr(prot, 'outputMicrographs'):
                 self.uploadAlignMovies(prot)
+                isActiveAlignMovies = prot.isActive()
             elif isinstance(prot, ProtCTFMicrographs) and hasattr(prot, 'outputCTF'):
                 self.uploadCTFMicrographs(prot)
+                isActiveCTFMicrographs = prot.isActive()
+
+        # Update json file
+        if self.allParamsJsonFile is not None:
+            f = open(self.allParamsJsonFile, "w")
+            f.write(json.dumps(self.allParams, indent=4))
+            f.close()
 
         self.info("MonitorISPyB: end step --------------------------")
 
-        return False
+        if isActiveImportMovies or isActiveAlignMovies or isActiveCTFMicrographs:
+            finished = False
+        else:
+            self.info("MonitorISPyB: All upstream activities ended, stopping monitor")
+            finished = True    
+
+        return finished
 
     def iter_updated_set(self, objSet):
         objSet.load()
@@ -257,7 +281,6 @@ class MonitorISPyB_ESRF(Monitor):
     
                 self.allParams[movieNumber] = {
                     "movieFullPath": movieFullPath,
-                    "prefix": prefix,   
                     "date": date,   
                     "hour": hour,   
                     "movieId": movieId,   
@@ -323,6 +346,8 @@ class MonitorISPyB_ESRF(Monitor):
                     self.info("ERROR: motionCorrectionObject is None!")
                     motionCorrectionId = None
                 self.allParams[movieNumber]["motionCorrectionId"] = motionCorrectionId
+                self.allParams[movieNumber]["totalMotion"] = totalMotion
+                self.allParams[movieNumber]["averageMotionPerFrame"] = averageMotionPerFrame
                 self.info("Align movies done, motionCorrectionId = {0}".format(motionCorrectionId))
 
     def uploadCTFMicrographs(self, prot):
@@ -339,10 +364,11 @@ class MonitorISPyB_ESRF(Monitor):
                 spectraImageSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageSnapshotFullPath)
                 spectraImageFullPath = dictResults["spectraImageFullPath"]
                 spectraImagePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageFullPath)
-                defocusU = dictResults["defocusU"]
-                defocusV = dictResults["defocusV"]
-                angle = dictResults["angle"]
-                crossCorrelationCoefficient = dictResults["crossCorrelationCoefficient"]
+                defocusU = dictResults["Defocus_U"]
+                defocusV = dictResults["Defocus_V"]
+                angle = dictResults["Angle"]
+                crossCorrelationCoefficient = dictResults["CCC"]
+                phaseShift = dictResults["Phase_shift"]
                 resolutionLimit = dictResults["resolutionLimit"]
                 estimatedBfactor = dictResults["estimatedBfactor"]
                 logFilePath = ISPyB_ESRF_Utils.copyToPyarchPath(dictResults["logFilePath"])
@@ -363,5 +389,10 @@ class MonitorISPyB_ESRF(Monitor):
                     self.info("ERROR: ctfObject is None!")
                     CTFid = None
                 self.allParams[movieNumber]["CTFid"] = CTFid
+                self.allParams[movieNumber]["phaseShift"] = phaseShift
+                self.allParams[movieNumber]["defocusU"] = defocusU
+                self.allParams[movieNumber]["defocusV"] = defocusV
+                self.allParams[movieNumber]["angle"] = angle
+                self.allParams[movieNumber]["crossCorrelationCoefficient"] = crossCorrelationCoefficient
                 self.info("CTF done, CTFid = {0}".format(CTFid))
 

@@ -27,10 +27,14 @@
 
 import os
 import sys
+import glob
+import time
+import pprint
 import tempfile
 from pyworkflow.manager import Manager
 import pyworkflow.utils as pwutils
-
+from pyworkflow.protocol import getProtocolFromDb
+from pyworkflow.em.packages.ispyb.ispyb_esrf_utils import ISPyB_ESRF_Utils
 
 def usage(error):
     print """
@@ -45,10 +49,20 @@ def usage(error):
     """ % error
     sys.exit(1)
 
+def getUpdatedProtocol(protocol):
+    """ Retrieve the updated protocol and close db connections
+        """
+    prot2 = getProtocolFromDb(os.getcwd(),
+                              protocol.getDbPath(),
+                              protocol.getObjId())
+    # Close DB connections
+    prot2.getProject().closeMapper()
+    prot2.closeMappers()
+    return prot2
 
 n = len(sys.argv)
 
-if n != 6:
+if n != 7:
     usage("Incorrect number of input parameters")
 
 dataDirectory = sys.argv[1]
@@ -56,6 +70,7 @@ filesPattern = sys.argv[2]
 projName = sys.argv[3]
 proteinAcronym = sys.argv[4]
 sampleAcronym = sys.argv[5]
+allParamsJsonFile = sys.argv[6]
 
 path = os.path.join(os.environ['SCIPION_HOME'], 'pyworkflow', 'gui', 'no-tkinter')
 sys.path.insert(1, path)
@@ -69,6 +84,21 @@ else:
     location = tempfile.mkdtemp(prefix="ScipionUserData_")
 
 
+# Get meta data like phasePlateUsed
+
+doPhaseShiftEstimation = "false"
+listMovies = glob.glob(os.path.join(dataDirectory, filesPattern))
+
+if len(listMovies) == 0:
+    print("ERROR! No movies acqured yet.")
+    sys.exit(1)
+
+firstMovieFullPath = listMovies[0]
+jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(firstMovieFullPath)
+if os.path.exists(xml):
+    dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xml)
+    doPhaseShiftEstimation = dictResults["phasePlateUsed"]
+    
 # Create json file
 
 jsonString = """[
@@ -180,7 +210,7 @@ jsonString = """[
         "HighResH": 4.0,
         "HighResBf": 50,
         "doValidate": false,
-        "doPhShEst": false,
+        "doPhShEst": %s,
         "phaseShiftL": 0.0,
         "phaseShiftH": 180.0,
         "phaseShiftS": 10.0,
@@ -199,9 +229,10 @@ jsonString = """[
         "proposal": "mx415",
         "proteinAcronym": "%s",
         "sampleAcronym": "%s",
-        "db": 1
+        "db": 1,
+        "allParamsJsonFile": "%s"
     }
-]""" % (dataDirectory, filesPattern, proteinAcronym, sampleAcronym)
+]""" % (dataDirectory, filesPattern, doPhaseShiftEstimation, proteinAcronym, sampleAcronym, allParamsJsonFile)
 
 # Write json file
 fd, jsonFile = tempfile.mkstemp(suffix=".json", prefix="scipion_workflow_")
@@ -225,3 +256,26 @@ project = manager.createProject(projName, location=location)
 
 if jsonFile is not None:
     protDict = project.loadProtocols(jsonFile)
+    
+# Start the project
+runs = project.getRuns()
+
+# Now assuming that there is no dependencies between runs
+# and the graph is lineal
+for prot in runs:
+    project.scheduleProtocol(prot)
+
+
+# Monitor the execution:
+doContinue = True
+while doContinue:
+    doContinue = False
+    updatedRuns = [getUpdatedProtocol(p) for p in runs] 
+    for prot in updatedRuns:
+        print("")
+        print("{0} status: {1}".format(prot.getRunName(), prot.getStatusMessage()))
+        if prot.isActive():
+            doContinue = True
+    time.sleep(5)
+        
+    

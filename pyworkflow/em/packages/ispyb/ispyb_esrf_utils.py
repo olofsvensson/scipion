@@ -58,7 +58,7 @@ class ISPyB_ESRF_Utils(object):
         runDirectory = os.path.dirname(imageDiscDirectory)
         runName = os.path.basename(runDirectory)
         topDir = os.path.dirname(runDirectory)
-        gridSquareTopDataDir = os.path.join(topDir, "supervisor_20171109_095814", runName, imageDiscName)
+        gridSquareTopDataDir = os.path.join(topDir, "test", runName, imageDiscName)
         for gridSquareDir in glob.glob(os.path.join(gridSquareTopDataDir, "*")):
             dataDir = os.path.join(gridSquareDir, "Data")
             if os.path.exists(dataDir):
@@ -155,6 +155,8 @@ class ISPyB_ESRF_Utils(object):
         for dictKey, dictValue in listKeyValue:
             if dictKey["Key"] == "Dose":
                 dictResults["dose"] = dictValue["Value"]
+            if dictKey["Key"] == "PhasePlateUsed":
+                dictResults["phasePlateUsed"] = dictValue["Value"]
         dictResults["numberOffractions"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "NumberOffractions")[0]
         dictResults["nominalMagnification"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "NominalMagnification")[0]
         dictResults["positionX"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "X")[0]
@@ -184,10 +186,11 @@ class ISPyB_ESRF_Utils(object):
         dictResults = {
             "spectraImageSnapshotFullPath": None,
             "spectraImageFullPath": None,
-            "defocusU": None,
-            "defocusV": None,
-            "angle": None,
-            "crossCorrelationCoefficient": None,
+            "Defocus_U": None,
+            "Defocus_V": None,
+            "Angle": None,
+            "CCC": None,
+            "Phase_shift": None,
             "resolutionLimit": None,
             "estimatedBfactor": None,
             "logFilePath": None,
@@ -210,13 +213,11 @@ class ISPyB_ESRF_Utils(object):
                 f.close()
                 index = 0
                 for index in range(len(lines)):
-                    if "Defocus_U" in lines[index]:
-                        index += 1
+                    if "Final Values" in lines[index]:
+                        listLabels = lines[index-1].split()
                         listValues = lines[index].split()
-                        dictResults["defocusU"] = listValues[0]
-                        dictResults["defocusV"] = listValues[1]
-                        dictResults["angle"] = listValues[2]
-                        dictResults["crossCorrelationCoefficient"] = listValues[3]
+                        for label, value in zip(listLabels, listValues):
+                            dictResults[label] = value
                     elif "Resolution limit" in lines[index]:
                         listValues = lines[index].split()
                         dictResults["resolutionLimit"] = listValues[-2]
