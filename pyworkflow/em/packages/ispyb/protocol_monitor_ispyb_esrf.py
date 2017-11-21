@@ -394,5 +394,6 @@ class MonitorISPyB_ESRF(Monitor):
                 self.allParams[movieNumber]["defocusV"] = defocusV
                 self.allParams[movieNumber]["angle"] = angle
                 self.allParams[movieNumber]["crossCorrelationCoefficient"] = crossCorrelationCoefficient
+                self.allParams[movieNumber]["resolutionLimit"] = resolutionLimit
                 self.info("CTF done, CTFid = {0}".format(CTFid))
 
