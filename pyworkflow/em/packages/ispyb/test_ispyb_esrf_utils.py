@@ -43,7 +43,7 @@ class Test(unittest.TestCase):
         
         
 
-    def tes_getMovieJpegMrcXml(self):
+    def test_getMovieJpegMrcXml(self):
 #        movieFullPath = "/data/visitor/mx415/cm01/20171103/RAW_DATA/test4/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/FoilHole_19150716_Data_19148705_19148706_20170619_1744-0055.mrc"
 #        jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
 #        print(jpeg, mrc, xml, gridSquareThumbNail)
@@ -53,7 +53,10 @@ class Test(unittest.TestCase):
 #        movieFullPath = "/data/cm01/inhouse/nicetest/supervisor_20171109_143730/Images-Disc1/GridSquare_9191979/Data/FoilHole_9208897_Data_9209280_9209281_20171109_1611-0556.mrc"
 #        jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
 #        print(jpeg, mrc, xml, gridSquareThumbNail)
-        movieFullPath = "/data/cm01/inhouse/nicetest/supervisor_20171115_150623/Images-Disc1/GridSquare_15441375/Data/FoilHole_15445484_Data_15444206_15444207_20171115_1620-1324.mrc"
+#        movieFullPath = "/data/cm01/inhouse/nicetest/supervisor_20171115_150623/Images-Disc1/GridSquare_15441375/Data/FoilHole_15445484_Data_15444206_15444207_20171115_1620-1324.mrc"
+#        jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
+#        print(jpeg, mrc, xml, gridSquareThumbNail)
+        movieFullPath = "/data/visitor/mx415/cm01/20171123/RAW_DATA/testsecretin-grid1/Images-Disc1/GridSquare_23722826/Data/FoilHole_23724105_Data_23724797_23724798_20171123_1448-3385.mrc"
         jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
         print(jpeg, mrc, xml, gridSquareThumbNail)
  
@@ -76,7 +79,7 @@ class Test(unittest.TestCase):
         pprint.pprint(dictResults)
     
 
-    def test_getCtfMetaData(self):
+    def tes_getCtfMetaData(self):
         workingDir = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000977_ProtGctf"
         mrcFilePath = "/scisoft/pxsoft/data/cryoem/testRunData/20171017/000859_ProtMotionCorr/extra/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344_aligned_mic.mrc"
         dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, mrcFilePath)

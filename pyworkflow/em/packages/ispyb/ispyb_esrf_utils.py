@@ -41,41 +41,55 @@ class ISPyB_ESRF_Utils(object):
 
     @staticmethod
     def getMovieJpegMrcXml(movieFilePath):
-        movieFileName = os.path.basename(movieFilePath)
-        jpeg = None
         mrc = None
         xml = None
         gridSquareSnapshot = None
-        doContinue = True
-        movieDirectory = os.path.dirname(movieFilePath)
-        imageDiscDirectory = os.path.dirname(movieDirectory)
-        imageDiscName = os.path.basename(movieDirectory)
-        if imageDiscName == "Data":
-            gridSquareDirectory = imageDiscDirectory
-            gridSquareName = os.path.basename(gridSquareDirectory)
-            imageDiscDirectory = os.path.dirname(gridSquareDirectory)
-            imageDiscName = os.path.basename(imageDiscDirectory)
-        runDirectory = os.path.dirname(imageDiscDirectory)
-        runName = os.path.basename(runDirectory)
-        topDir = os.path.dirname(runDirectory)
-        gridSquareTopDataDir = os.path.join(topDir, "test", runName, imageDiscName)
-        for gridSquareDir in glob.glob(os.path.join(gridSquareTopDataDir, "*")):
-            dataDir = os.path.join(gridSquareDir, "Data")
-            if os.path.exists(dataDir):
-                listMrcFiles = glob.glob(os.path.join(dataDir, "*.mrc"))
-                for mrcFile in listMrcFiles:
-                    filePathWithoutSuffix = os.path.splitext(mrcFile)[0]
-                    fileNameWithoutSuffix = os.path.basename(filePathWithoutSuffix)
-                    #print(fileNameWithoutSuffix)
-                    if movieFileName.startswith(fileNameWithoutSuffix):
-                        mrc = mrcFile
-                        jpeg = filePathWithoutSuffix + ".jpg"
-                        xml = filePathWithoutSuffix + ".xml"
-                        # Assume that the grid square thumb nail is one level above
-                        listSnapshot = glob.glob(os.path.join(gridSquareDir, "*.jpg"))
-                        if len(listSnapshot) > 0:
-                            gridSquareSnapshot = listSnapshot[-1]
-                        break
+        dictFileName = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFilePath)
+        filePrefix = "{directory}/{prefix}_{id1}_Data_{id2}_{id3}_{date}_{hour}".format(**dictFileName)
+        jpeg = filePrefix + ".jpg"
+        if not os.path.exists(jpeg):
+            jpeg = None
+        mrc = filePrefix + ".mrc"
+        if not os.path.exists(mrc):
+            mrc = None
+        xml = filePrefix + ".xml"
+        if not os.path.exists(xml):
+            xml = None
+        gridSquareDir = os.path.dirname(os.path.dirname(movieFilePath))
+        listSnapshot = glob.glob(os.path.join(gridSquareDir, "*.jpg"))
+        if len(listSnapshot) > 0:
+            gridSquareSnapshot = listSnapshot[-1]
+            
+#        doContinue = True
+#        movieDirectory = os.path.dirname(movieFilePath)
+#        imageDiscDirectory = os.path.dirname(movieDirectory)
+#        imageDiscName = os.path.basename(movieDirectory)
+#        if imageDiscName == "Data":
+#            gridSquareDirectory = imageDiscDirectory
+#            gridSquareName = os.path.basename(gridSquareDirectory)
+#            imageDiscDirectory = os.path.dirname(gridSquareDirectory)
+#            imageDiscName = os.path.basename(imageDiscDirectory)
+#        runDirectory = os.path.dirname(imageDiscDirectory)
+#        runName = os.path.basename(runDirectory)
+#        topDir = os.path.dirname(runDirectory)
+#        gridSquareTopDataDir = os.path.join(topDir, "test", runName, imageDiscName)
+#        for gridSquareDir in glob.glob(os.path.join(gridSquareTopDataDir, "*")):
+#            dataDir = os.path.join(gridSquareDir, "Data")
+#            if os.path.exists(dataDir):
+#                listMrcFiles = glob.glob(os.path.join(dataDir, "*.mrc"))
+#                for mrcFile in listMrcFiles:
+#                    filePathWithoutSuffix = os.path.splitext(mrcFile)[0]
+#                    fileNameWithoutSuffix = os.path.basename(filePathWithoutSuffix)
+#                    #print(fileNameWithoutSuffix)
+#                    if movieFileName.startswith(fileNameWithoutSuffix):
+#                        mrc = mrcFile
+#                        jpeg = filePathWithoutSuffix + ".jpg"
+#                        xml = filePathWithoutSuffix + ".xml"
+#                        # Assume that the grid square thumb nail is one level above
+#                        listSnapshot = glob.glob(os.path.join(gridSquareDir, "*.jpg"))
+#                        if len(listSnapshot) > 0:
+#                            gridSquareSnapshot = listSnapshot[-1]
+#                        break
         return jpeg, mrc, xml, gridSquareSnapshot
 
 

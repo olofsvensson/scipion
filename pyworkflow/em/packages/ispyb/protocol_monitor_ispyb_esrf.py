@@ -34,7 +34,6 @@
 import os
 import sys
 import json
-import pprint
 import time
 import collections
 import ConfigParser
@@ -44,7 +43,6 @@ sys.path.insert(0, "/opt/pxsoft/EDNA/vMX/edna/libraries/suds-0.4")
 from suds.client import Client
 from suds.transport.http import HttpAuthenticated
 
-import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.em.protocol import ProtMonitor, Monitor, PrintNotifier
@@ -321,7 +319,7 @@ class MonitorISPyB_ESRF(Monitor):
                 firstFrame = 1
                 lastFrame = self.allParams[movieNumber]["imagesCount"]
                 dosePerFrame = self.allParams[movieNumber]["dosePerFrame"]
-                doseWeight = "Dummy value: 2.0"
+                doseWeight = None
                 driftPlotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(driftPlotFullPath)
                 micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
                 correctedDoseMicrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(correctedDoseMicrographFullPath)
