@@ -43,7 +43,7 @@ class Test(unittest.TestCase):
         
         
 
-    def test_getMovieJpegMrcXml(self):
+    def tes_getMovieJpegMrcXml(self):
 #        movieFullPath = "/data/visitor/mx415/cm01/20171103/RAW_DATA/test4/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/FoilHole_19150716_Data_19148705_19148706_20170619_1744-0055.mrc"
 #        jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
 #        print(jpeg, mrc, xml, gridSquareThumbNail)
@@ -105,6 +105,12 @@ class Test(unittest.TestCase):
         mrcFilePath = "/data/visitor/mx415/cm01/20171108/RAW_DATA/test2/CWAT_ESRF_RawData_K2/170620_TMV_1/Images-Disc1/GridSquare_20174003/Data/FoilHole_20182354_Data_20179605_20179606_20170620_1523-1198.mrc"
         pyarchFilePath = ISPyB_ESRF_Utils.copyToPyarchPath(mrcFilePath)
         print(pyarchFilePath)
+
+    def test_getProposal(self):
+        movieFilePath = "/data/visitor/mx2001/cm01/20171124/RAW_DATA/Data-hug-grid1/Images-Disc1/GridSquare_24748253/Data/FoilHole_24762814_Data_24757346_24757347_20171126_0223-4929.mrc"
+        proposal = ISPyB_ESRF_Utils.getProposal(movieFilePath)
+        print(proposal)
+
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

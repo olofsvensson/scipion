@@ -34,11 +34,29 @@ import time
 import socket
 import shutil
 import pprint
+import traceback
 import xml.etree.ElementTree
 
 
 class ISPyB_ESRF_Utils(object):
 
+
+    @staticmethod
+    def getProposal(movieFilePath):
+        proposal = None
+        listDirectory = movieFilePath.split(os.sep)
+        # First check: directory must start with "data":
+        if listDirectory[1] == "data":
+            # Then check if second level is "visitor":
+            if listDirectory[2] == "visitor":
+                proposal = listDirectory[3]
+            elif listDirectory[3] == "inhouse":
+                proposal = listDirectory[4]
+        return proposal
+        
+    
+    
+    
     @staticmethod
     def getMovieJpegMrcXml(movieFilePath):
         mrc = None
@@ -177,6 +195,14 @@ class ISPyB_ESRF_Utils(object):
         dictResults["positionY"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "Y")[0]
         dictResults["accelerationVoltage"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "AccelerationVoltage")[0]
         dictResults["acquisitionDateTime"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "acquisitionDateTime")[0]
+        listKeyValue = ISPyB_ESRF_Utils.get_recursively(dictXML, "CameraSpecificInput")[0]
+        print(listKeyValue)
+        for dictKeyValueOfstringanyType in listKeyValue:
+            dictKey = dictKeyValueOfstringanyType["KeyValueOfstringanyType"][0]
+            dictValue = dictKeyValueOfstringanyType["KeyValueOfstringanyType"][1]
+            if dictKey["Key"] == "SuperResolutionFactor":
+                dictResults["superResolutionFactor"] = dictValue["Value"]
+        #dictResults["superResolutionFactor"] = ISPyB_ESRF_Utils.get_recursively(dictXML, "superResolutionFactor")
         return dictResults
 
     @staticmethod
@@ -318,38 +344,42 @@ class ISPyB_ESRF_Utils(object):
     @ staticmethod
     def copyToPyarchPath(filePath):
         pyarchFilePath = None
-        if os.path.exists(filePath):
-            # Check if we have a "standard" ESRF data path
-            if "RAW_DATA" in filePath or "PROCESSED_DATA" in filePath:
-                pyarchFilePath = ISPyB_ESRF_Utils.getPyarchFilePath(filePath)
-                pyarchFileDir = os.path.dirname(pyarchFilePath)
-                if not os.path.exists(pyarchFileDir):
-                    os.makedirs(pyarchFileDir, 0755)
-                shutil.copy(filePath, pyarchFilePath)
-            else:
-                # Test path:
-                testPath = "/data/pyarch/2017/cm01/test"
-                # Add date
-                datePath = os.path.join(testPath, time.strftime("%Y%m%d", time.localtime(time.time())))
-                # Loop until done
-                isDone = False
-                fileName = os.path.basename(filePath)
-                pyarchFilePath = None
-                while not isDone:
-                    timePath = os.path.join(datePath, time.strftime("%H%M%S", time.localtime(time.time())))
-                    if os.path.exists(timePath):
-                        time.sleep(1)
-                    else:
-                        pyarchFilePath = os.path.join(timePath, fileName)
-                        if "linsvensson" in socket.gethostname(): 
-                            if os.path.getsize(filePath) < 1e6:
-                                # For the moment, only copy file if smaller than 1 MB
-                                os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
-                                os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+        if filePath is not None and os.path.exists(filePath):
+            try:
+                # Check if we have a "standard" ESRF data path
+                if "RAW_DATA" in filePath or "PROCESSED_DATA" in filePath:
+                    pyarchFilePath = ISPyB_ESRF_Utils.getPyarchFilePath(filePath)
+                    pyarchFileDir = os.path.dirname(pyarchFilePath)
+                    if not os.path.exists(pyarchFileDir):
+                        os.makedirs(pyarchFileDir, 0755)
+                    shutil.copy(filePath, pyarchFilePath)
+                else:
+                    # Test path:
+                    testPath = "/data/pyarch/2017/cm01/test"
+                    # Add date
+                    datePath = os.path.join(testPath, time.strftime("%Y%m%d", time.localtime(time.time())))
+                    # Loop until done
+                    isDone = False
+                    fileName = os.path.basename(filePath)
+                    pyarchFilePath = None
+                    while not isDone:
+                        timePath = os.path.join(datePath, time.strftime("%H%M%S", time.localtime(time.time())))
+                        if os.path.exists(timePath):
+                            time.sleep(1)
                         else:
-                            os.makedirs(timePath, 0755)
-                            shutil.copy(filePath, pyarchFilePath)
-                        isDone = True
+                            pyarchFilePath = os.path.join(timePath, fileName)
+                            if "linsvensson" in socket.gethostname(): 
+                                if os.path.getsize(filePath) < 1e6:
+                                    # For the moment, only copy file if smaller than 1 MB
+                                    os.system("ssh mxhpc2-1705 'mkdir -p {0}'".format(timePath))
+                                    os.system("scp {0} mxhpc2-1705:{1}".format(filePath, pyarchFilePath))
+                            else:
+                                os.makedirs(timePath, 0755)
+                                shutil.copy(filePath, pyarchFilePath)
+                            isDone = True
+            except:
+                print("ERROR uploading file {0} tp pyarch!".format(filePath))
+                traceback.print_exc()
             if pyarchFilePath is None or not os.path.exists(pyarchFilePath):
                 pyarchFilePath = filePath
         return pyarchFilePath

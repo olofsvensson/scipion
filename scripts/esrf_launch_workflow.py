@@ -30,6 +30,7 @@ import sys
 import glob
 import time
 import pprint
+import datetime
 import tempfile
 from pyworkflow.manager import Manager
 import pyworkflow.utils as pwutils
@@ -43,8 +44,11 @@ def usage(error):
     Usage: scipion python scripts/esrf_launch_workflow.py
         dataDirectory="folder" location of raw data (movie files)
         filesPattern="pattern" template for movie files
-        name="project name"
+        name="Scipion project name (must be unique)"
+        proteinAcronym="Protein acronym name"
         sampleAcronym="Sample acronym name"
+        doseInitial="Total dose"
+        dosePerFrame="Dose per frame"
         This script will create and run a project 
     """ % error
     sys.exit(1)
@@ -62,7 +66,7 @@ def getUpdatedProtocol(protocol):
 
 n = len(sys.argv)
 
-if n != 7:
+if n != 8:
     usage("Incorrect number of input parameters")
 
 dataDirectory = sys.argv[1]
@@ -70,7 +74,8 @@ filesPattern = sys.argv[2]
 projName = sys.argv[3]
 proteinAcronym = sys.argv[4]
 sampleAcronym = sys.argv[5]
-allParamsJsonFile = sys.argv[6]
+doseInitial = float(sys.argv[6])
+dosePerFrame = float(sys.argv[7])
 
 path = os.path.join(os.environ['SCIPION_HOME'], 'pyworkflow', 'gui', 'no-tkinter')
 sys.path.insert(1, path)
@@ -83,6 +88,14 @@ if "RAW_DATA" in dataDirectory:
 else:
     location = tempfile.mkdtemp(prefix="ScipionUserData_")
 
+# All param json file
+allParamsJsonFile = os.path.join(location, "{0}_{1}.json".format(proteinAcronym,sampleAcronym))
+#index = 1
+#while os.path.exists(allParamsJsonFile):
+#    allParamsJsonFile = os.path.join(location, "{0}_{1}_{2}.json".format(proteinAcronym,sampleAcronym, index))
+#    index += 1
+
+print("All param json file: {0}".format(allParamsJsonFile))
 
 # Get meta data like phasePlateUsed
 
@@ -94,11 +107,34 @@ if len(listMovies) == 0:
     sys.exit(1)
 
 firstMovieFullPath = listMovies[0]
+
+# Check proposal
+# db=0: production
+# db=1: valid
+# db=2: lindemaria
+# db=3: localhost
+proposal = ISPyB_ESRF_Utils.getProposal(firstMovieFullPath)
+if proposal is None:
+    print("WARNING! No valid proposal could be found for movie {0}.".format(firstMovieFullPath))
+    print("No data will be uploaded to ISPyB.")
+    db = 3
+else:
+    print("Proposal: {0}".format(proposal))
+    if proposal == "mx415":
+        # Use valid data base
+        db = 1
+    else:
+        # Use productiond data base
+        db = 0
+
 jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(firstMovieFullPath)
-if os.path.exists(xml):
-    dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xml)
-    doPhaseShiftEstimation = dictResults["phasePlateUsed"]
-    
+
+dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xml)
+doPhaseShiftEstimation = dictResults["phasePlateUsed"]
+nominalMagnification = int(dictResults["nominalMagnification"])
+superResolutionFactor = int(dictResults["superResolutionFactor"])
+
+samplingRate = 1.1 / float(superResolutionFactor) 
 # Create json file
 
 jsonString = """[
@@ -115,15 +151,15 @@ jsonString = """[
         "copyFiles": false,
         "haveDataBeenPhaseFlipped": false,
         "acquisitionWizard": null,
-        "voltage": 200.0,
-        "sphericalAberration": 2.0,
+        "voltage": 300.0,
+        "sphericalAberration": 2.7,
         "amplitudeContrast": 0.1,
-        "magnification": 50000,
+        "magnification": %d,
         "samplingRateMode": 0,
-        "samplingRate": 1.0,
-        "scannedPixelSize": 7.0,
-        "doseInitial": 0.0,
-        "dosePerFrame": 1.0,
+        "samplingRate": %f,
+        "scannedPixelSize": 5.0,
+        "doseInitial": %f,
+        "dosePerFrame": %f,
         "gainFile": null,
         "darkFile": null,
         "dataStreaming": true,
@@ -206,8 +242,8 @@ jsonString = """[
         "overlap": 0.5,
         "convsize": 85,
         "doHighRes": true,
-        "HighResL": 15.0,
-        "HighResH": 4.0,
+        "HighResL": 30.0,
+        "HighResH": 5.0,
         "HighResBf": 50,
         "doValidate": false,
         "doPhShEst": %s,
@@ -226,13 +262,15 @@ jsonString = """[
         "runMode": 0,
         "inputProtocols": ["2", "77", "195"],
         "samplingInterval": 30,
-        "proposal": "mx415",
+        "proposal": "%s",
         "proteinAcronym": "%s",
         "sampleAcronym": "%s",
-        "db": 1,
+        "db": %d,
         "allParamsJsonFile": "%s"
     }
-]""" % (dataDirectory, filesPattern, doPhaseShiftEstimation, proteinAcronym, sampleAcronym, allParamsJsonFile)
+]""" % (dataDirectory, filesPattern, nominalMagnification, samplingRate, \
+        doseInitial, dosePerFrame, doPhaseShiftEstimation, proposal, \
+        proteinAcronym, sampleAcronym, db, allParamsJsonFile)
 
 # Write json file
 fd, jsonFile = tempfile.mkstemp(suffix=".json", prefix="scipion_workflow_")
@@ -262,20 +300,21 @@ runs = project.getRuns()
 
 # Now assuming that there is no dependencies between runs
 # and the graph is lineal
-for prot in runs:
-    project.scheduleProtocol(prot)
+#for prot in runs:
+#    project.scheduleProtocol(prot)
 
 
 # Monitor the execution:
-doContinue = True
+doContinue = False
 while doContinue:
     doContinue = False
-    updatedRuns = [getUpdatedProtocol(p) for p in runs] 
+    updatedRuns = [getUpdatedProtocol(p) for p in runs]
+    print("") 
+    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) 
     for prot in updatedRuns:
-        print("")
         print("{0} status: {1}".format(prot.getRunName(), prot.getStatusMessage()))
         if prot.isActive():
             doContinue = True
-    time.sleep(5)
+    time.sleep(15)
         
     

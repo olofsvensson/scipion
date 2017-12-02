@@ -35,6 +35,7 @@ import os
 import sys
 import json
 import time
+import traceback
 import collections
 import ConfigParser
 
@@ -77,7 +78,7 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
 
         group2 = form.addGroup('Parameters')
         group2.addParam('db', params.EnumParam,
-                        choices=["production", "valid"],
+                        choices=["production", "valid", "lindemaria", "test"],
                         label="Database",
                         help="Select which ISPyB database you want to use.")
 
@@ -103,7 +104,8 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
     
         username = str(credentialsConfig.get('Credential', 'user'))
         password = str(credentialsConfig.get('Credential', 'password'))
-        url = str(config.get('Connection', 'url'))
+        url = str(config.get('Connection', 'url_{0}'.format(self.db.get())))
+        self.info("ISPyB URL: {0}".format(url))
         listEmailReceivers = str(config.get('Email', 'receivers'))
         emailReplyTo = str(config.get('Email', 'replyTo'))
     
@@ -138,11 +140,19 @@ class MonitorISPyB_ESRF(Monitor):
         self.movieDirectory = None
         self.currentDir = os.getcwd()
         self.beamlineName = "cm01"
-        self.allParams = collections.OrderedDict()
         if hasattr(protocol, "allParamsJsonFile"):
             self.allParamsJsonFile = protocol.allParamsJsonFile.get()
+            if os.path.exists(self.allParamsJsonFile):
+                try:
+                    dictAllParams = json.loads(open(self.allParamsJsonFile).read())
+                    self.allParams = collections.OrderedDict(dictAllParams)
+                except:
+                    self.allParams = collections.OrderedDict()
+            else:
+                self.allParams = collections.OrderedDict()    
         else:
             self.allParamsJsonFile = None
+            self.allParams = collections.OrderedDict()    
 
     def getUpdatedProtocol(self, protocol):
         """ Retrieve the updated protocol and close db connections
@@ -157,44 +167,50 @@ class MonitorISPyB_ESRF(Monitor):
 
     def step(self):
         self.info("MonitorISPyB: start step ------------------------")
-                        
-        runs = [self.getUpdatedProtocol(p.get()) for p in self.protocol.inputProtocols] 
-        
-        g = self.project.getGraphFromRuns(runs)
+        self.info("Number of movies in all params: {0}".format(len(self.allParams)))
 
-        nodes = g.getRoot().iterChildsBreadth()
-
-        isActiveImportMovies = True
-        isActiveAlignMovies = True
-        isActiveCTFMicrographs = True
-        
-        for n in nodes:
-            prot = n.run
-            #self.info("Protocol name: {0}".format(prot.getRunName()))
-
-            if isinstance(prot, ProtImportMovies):
-                self.uploadImportMovies(prot)
-                isActiveImportMovies = prot.isActive()
-            elif isinstance(prot, ProtAlignMovies) and hasattr(prot, 'outputMicrographs'):
-                self.uploadAlignMovies(prot)
-                isActiveAlignMovies = prot.isActive()
-            elif isinstance(prot, ProtCTFMicrographs) and hasattr(prot, 'outputCTF'):
-                self.uploadCTFMicrographs(prot)
-                isActiveCTFMicrographs = prot.isActive()
-
-        # Update json file
-        if self.allParamsJsonFile is not None:
-            f = open(self.allParamsJsonFile, "w")
-            f.write(json.dumps(self.allParams, indent=4))
-            f.close()
-
-        self.info("MonitorISPyB: end step --------------------------")
-
-        if isActiveImportMovies or isActiveAlignMovies or isActiveCTFMicrographs:
-            finished = False
-        else:
-            self.info("MonitorISPyB: All upstream activities ended, stopping monitor")
+        if self.proposal == "None":
+            print("WARNING! Proposal is 'None', no data uploaded to ISPyB")
             finished = True    
+        else:
+            runs = [self.getUpdatedProtocol(p.get()) for p in self.protocol.inputProtocols] 
+            
+            g = self.project.getGraphFromRuns(runs)
+    
+            nodes = g.getRoot().iterChildsBreadth()
+    
+            isActiveImportMovies = True
+            isActiveAlignMovies = True
+            isActiveCTFMicrographs = True
+            
+            for n in nodes:
+                prot = n.run
+                #self.info("Protocol name: {0}".format(prot.getRunName()))
+    
+                if isinstance(prot, ProtImportMovies):
+                    self.uploadImportMovies(prot)
+                    isActiveImportMovies = prot.isActive()
+                elif isinstance(prot, ProtAlignMovies) and hasattr(prot, 'outputMicrographs'):
+                    self.uploadAlignMovies(prot)
+                    isActiveAlignMovies = prot.isActive()
+                elif isinstance(prot, ProtCTFMicrographs) and hasattr(prot, 'outputCTF'):
+                    self.uploadCTFMicrographs(prot)
+                    isActiveCTFMicrographs = prot.isActive()
+    
+            # Update json file
+            if self.allParamsJsonFile is not None:
+                f = open(self.allParamsJsonFile, "w")
+                f.write(json.dumps(self.allParams, indent=4))
+                f.close()
+    
+
+            if isActiveImportMovies or isActiveAlignMovies or isActiveCTFMicrographs:
+                finished = False
+            else:
+                self.info("MonitorISPyB: All upstream activities ended, stopping monitor")
+                finished = True
+                    
+        self.info("MonitorISPyB: end step --------------------------")
 
         return finished
 
@@ -209,8 +225,9 @@ class MonitorISPyB_ESRF(Monitor):
     def uploadImportMovies(self, prot):
         for movieFullPath in prot.getMatchFiles():
             listMovieFullPath = [ self.allParams[movieNumber]["movieFullPath"] for movieNumber in self.allParams if "movieFullPath" in self.allParams[movieNumber]]
-            # self.info("listMovieFullPath: {0}".format(listMovieFullPath))
-            if not movieFullPath in listMovieFullPath:                
+            if movieFullPath in listMovieFullPath:
+                self.info("Movie already uploaded: {0}".format(movieFullPath))
+            else:                
                 self.info("Import movies: movieFullPath: {0}".format(movieFullPath))
                 dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
                 self.movieDirectory = dictFileNameParameters["directory"]
@@ -225,32 +242,58 @@ class MonitorISPyB_ESRF(Monitor):
                    ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
                 
                 time.sleep(1)
-                while micrographSnapshotFullPath is None or micrographFullPath is None or xmlMetaDataFullPath is None or gridSquareSnapshotFullPath is None:
-                    self.info("Import movies: waiting for meta-data files to appear on disk...")
+                startTime = time.time()
+                doContinue = True
+                while doContinue:
                     time.sleep(5)
                     micrographSnapshotFullPath, micrographFullPath, xmlMetaDataFullPath, gridSquareSnapshotFullPath = \
                        ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
-                time.sleep(1)
+                    if micrographSnapshotFullPath is None or micrographFullPath is None or xmlMetaDataFullPath is None or gridSquareSnapshotFullPath is None:
+                        self.info("Import movies: waiting for meta-data files to appear on disk...")
+                        timeNow = time.time()
+                        deltaTime = timeNow -startTime
+                        if deltaTime > 30:
+                            self.info("Import movies: Timeout waiting for meta-data files to appear on disk!!!")
+                            doContinue = False
+                    else:
+                        doContinue = False                         
+                        time.sleep(1)
     
                 self.info("Import movies: micrographSnapshotFullPath: {0}".format(micrographSnapshotFullPath))
     
-                micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
-                micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
-                xmlMetaDataPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(xmlMetaDataFullPath)
-                gridSquareSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(gridSquareSnapshotFullPath)
-                
-                dictMetaData = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
-                voltage = dictMetaData["accelerationVoltage"]
-                magnification = dictMetaData["nominalMagnification"]
-                imagesCount = dictMetaData["numberOffractions"]
-                positionX = dictMetaData["positionX"]
-                positionY = dictMetaData["positionY"]
-                dosePerImage = round( float(dictMetaData["dose"]) / 10.0**20 / float(imagesCount), 2)
+                micrographSnapshotPyarchPath = None
+                micrographPyarchPath = None
+                xmlMetaDataPyarchPath = None
+                gridSquareSnapshotPyarchPath = None
+                voltage = None
+                magnification = None
+                imagesCount = None
+                positionX = None
+                positionY = None
+                dosePerImage = None                    
+                if micrographSnapshotFullPath is not None:
+                    micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
+                    micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
+                    xmlMetaDataPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(xmlMetaDataFullPath)
+                    gridSquareSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(gridSquareSnapshotFullPath)
+                                            
+                    try:
+                        dictMetaData = ISPyB_ESRF_Utils.getXmlMetaData(xmlMetaDataFullPath)
+                        voltage = dictMetaData["accelerationVoltage"]
+                        magnification = dictMetaData["nominalMagnification"]
+                        imagesCount = dictMetaData["numberOffractions"]
+                        positionX = dictMetaData["positionX"]
+                        positionY = dictMetaData["positionY"]
+                        dosePerImage = round( float(dictMetaData["dose"]) / 10.0**20 / float(imagesCount), 2)
+                    except:
+                        self.info("ERROR reading XML file {0}".format(xmlMetaDataFullPath))
+                        traceback.print_exc()
                 sphericalAberration = None
                 amplitudeContrast = None
                 scannedPixelSize = None
-                    
-                movieObject = self.client.service.addMovie(proposal=self.proposal,
+                
+                try:
+                    movieObject = self.client.service.addMovie(proposal=self.proposal,
                                 proteinAcronym=self.proteinAcronym, 
                                 sampleAcronym=self.sampleAcronym, 
                                 movieDirectory=self.movieDirectory,
@@ -271,6 +314,11 @@ class MonitorISPyB_ESRF(Monitor):
                                 beamlineName=self.beamlineName,
                                 gridSquareSnapshotFullPath=gridSquareSnapshotPyarchPath,
                                 )
+                except:
+                    self.info("ERROR uploading movie {0}".format(movieFullPath))
+                    traceback.print_exc()
+                    movieObject = None
+                    
                 if movieObject is not None:
                     movieId = movieObject.movieId
                 else:
@@ -284,8 +332,10 @@ class MonitorISPyB_ESRF(Monitor):
                     "movieId": movieId,   
                     "imagesCount": imagesCount,     
                     "dosePerFrame": prot.dosePerFrame.get(),
+                    "proposal": self.proposal,
                  }
                 self.info("Import movies done, movieId = {0}".format(self.allParams[movieNumber]["movieId"]))
+
 
     def uploadAlignMovies(self, prot):
         self.info("ESRF ISPyB upload ")
@@ -325,7 +375,9 @@ class MonitorISPyB_ESRF(Monitor):
                 correctedDoseMicrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(correctedDoseMicrographFullPath)
                 micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
                 logFilePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(logFileFullPath)
-                motionCorrectionObject = self.client.service.addMotionCorrection(proposal=self.proposal, 
+                
+                try:
+                    motionCorrectionObject = self.client.service.addMotionCorrection(proposal=self.proposal, 
                                                 movieFullPath=movieFullPath,
                                                 firstFrame=firstFrame,
                                                 lastFrame=lastFrame,
@@ -338,14 +390,21 @@ class MonitorISPyB_ESRF(Monitor):
                                                 correctedDoseMicrographFullPath=correctedDoseMicrographPyarchPath,
                                                 micrographSnapshotFullPath=micrographSnapshotPyarchPath,
                                                 logFileFullPath=logFilePyarchPath)
+                except:
+                    self.info("ERROR uploading motion correction for movie {0}".format(movieFullPath))
+                    traceback.print_exc()
+                    motionCorrectionObject = None
+
                 if motionCorrectionObject is not None:
                     motionCorrectionId = motionCorrectionObject.motionCorrectionId
                 else:
                     self.info("ERROR: motionCorrectionObject is None!")
                     motionCorrectionId = None
+                    
                 self.allParams[movieNumber]["motionCorrectionId"] = motionCorrectionId
                 self.allParams[movieNumber]["totalMotion"] = totalMotion
                 self.allParams[movieNumber]["averageMotionPerFrame"] = averageMotionPerFrame
+                
                 self.info("Align movies done, motionCorrectionId = {0}".format(motionCorrectionId))
 
     def uploadCTFMicrographs(self, prot):
@@ -357,20 +416,38 @@ class MonitorISPyB_ESRF(Monitor):
             if movieNumber in self.allParams and not "CTFid" in self.allParams[movieNumber]:
                 self.info("CTF: movie {0}".format(os.path.basename(self.allParams[movieNumber]["movieFullPath"])))
                 movieFullPath = self.allParams[movieNumber]["movieFullPath"]
-                dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, micrographFullPath)
-                spectraImageSnapshotFullPath = dictResults["spectraImageSnapshotFullPath"]
-                spectraImageSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageSnapshotFullPath)
-                spectraImageFullPath = dictResults["spectraImageFullPath"]
-                spectraImagePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageFullPath)
-                defocusU = dictResults["Defocus_U"]
-                defocusV = dictResults["Defocus_V"]
-                angle = dictResults["Angle"]
-                crossCorrelationCoefficient = dictResults["CCC"]
-                phaseShift = dictResults["Phase_shift"]
-                resolutionLimit = dictResults["resolutionLimit"]
-                estimatedBfactor = dictResults["estimatedBfactor"]
+                spectraImageSnapshotFullPath = None
+                spectraImageSnapshotPyarchPath = None
+                spectraImageFullPath = None
+                spectraImagePyarchPath = None
+                defocusU = None
+                defocusV = None
+                angle = None
+                crossCorrelationCoefficient = None
+                phaseShift = None
+                resolutionLimit = None
+                estimatedBfactor = None                
+                try:
+                    dictResults = ISPyB_ESRF_Utils.getCtfMetaData(workingDir, micrographFullPath)
+                    spectraImageSnapshotFullPath = dictResults["spectraImageSnapshotFullPath"]
+                    spectraImageSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageSnapshotFullPath)
+                    spectraImageFullPath = dictResults["spectraImageFullPath"]
+                    spectraImagePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageFullPath)
+                    defocusU = dictResults["Defocus_U"]
+                    defocusV = dictResults["Defocus_V"]
+                    angle = dictResults["Angle"]
+                    crossCorrelationCoefficient = dictResults["CCC"]
+                    phaseShift = dictResults["Phase_shift"]
+                    resolutionLimit = dictResults["resolutionLimit"]
+                    estimatedBfactor = dictResults["estimatedBfactor"]
+                except:
+                    self.info("ERROR uploading CTF for movie {0}".format(movieFullPath))
+                    traceback.print_exc()
+                    ctfObject = None                
+                
                 logFilePath = ISPyB_ESRF_Utils.copyToPyarchPath(dictResults["logFilePath"])
-                ctfObject = self.client.service.addCTF(proposal=self.proposal, 
+                try:
+                    ctfObject = self.client.service.addCTF(proposal=self.proposal, 
                                         movieFullPath=movieFullPath,
                                         spectraImageSnapshotFullPath=spectraImageSnapshotPyarchPath,
                                         spectraImageFullPath=spectraImagePyarchPath,
@@ -381,11 +458,17 @@ class MonitorISPyB_ESRF(Monitor):
                                         resolutionLimit=resolutionLimit,
                                         estimatedBfactor=estimatedBfactor,
                                         logFilePath=logFilePath)
+                except:
+                    self.info("ERROR uploading CTF for movie {0}".format(movieFullPath))
+                    traceback.print_exc()
+                    ctfObject = None
+
                 if ctfObject is not None:
                     CTFid = ctfObject.CTFid
                 else:
                     self.info("ERROR: ctfObject is None!")
                     CTFid = None
+                    
                 self.allParams[movieNumber]["CTFid"] = CTFid
                 self.allParams[movieNumber]["phaseShift"] = phaseShift
                 self.allParams[movieNumber]["defocusU"] = defocusU
@@ -393,5 +476,6 @@ class MonitorISPyB_ESRF(Monitor):
                 self.allParams[movieNumber]["angle"] = angle
                 self.allParams[movieNumber]["crossCorrelationCoefficient"] = crossCorrelationCoefficient
                 self.allParams[movieNumber]["resolutionLimit"] = resolutionLimit
+                
                 self.info("CTF done, CTFid = {0}".format(CTFid))
 
