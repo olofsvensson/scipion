@@ -35,6 +35,7 @@ import os
 import sys
 import json
 import time
+import shutil
 import traceback
 import collections
 import ConfigParser
@@ -226,9 +227,15 @@ class MonitorISPyB_ESRF(Monitor):
         for movieFullPath in prot.getMatchFiles():
             listMovieFullPath = [ self.allParams[movieNumber]["movieFullPath"] for movieNumber in self.allParams if "movieFullPath" in self.allParams[movieNumber]]
             if movieFullPath in listMovieFullPath:
-                self.info("Movie already uploaded: {0}".format(movieFullPath))
+                pass
+                #self.info("Movie already uploaded: {0}".format(movieFullPath))
             else:                
                 self.info("Import movies: movieFullPath: {0}".format(movieFullPath))
+                # Create "process" directory
+                movieName = os.path.splitext(os.path.basename(movieFullPath))[0]
+                processDir = os.path.join(os.path.dirname(movieFullPath), "process", movieName)     
+                if not os.path.exists(processDir):
+                    os.makedirs(processDir, 0755)     
                 dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
                 self.movieDirectory = dictFileNameParameters["directory"]
                 prefix = dictFileNameParameters["prefix"]   
@@ -271,9 +278,8 @@ class MonitorISPyB_ESRF(Monitor):
                 positionX = None
                 positionY = None
                 dosePerImage = None                    
-                if micrographSnapshotFullPath is not None:
+                if micrographFullPath is not None:
                     micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
-                    micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
                     xmlMetaDataPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(xmlMetaDataFullPath)
                     gridSquareSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(gridSquareSnapshotFullPath)
                                             
@@ -327,6 +333,7 @@ class MonitorISPyB_ESRF(Monitor):
     
                 self.allParams[movieNumber] = {
                     "movieFullPath": movieFullPath,
+                    "processDir": processDir,
                     "date": date,   
                     "hour": hour,   
                     "movieId": movieId,   
@@ -371,11 +378,14 @@ class MonitorISPyB_ESRF(Monitor):
                 dosePerFrame = self.allParams[movieNumber]["dosePerFrame"]
                 doseWeight = None
                 driftPlotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(driftPlotFullPath)
-                micrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographFullPath)
-                correctedDoseMicrographPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(correctedDoseMicrographFullPath)
+                micrographPyarchPath = None
+                correctedDoseMicrographPyarchPath = None
                 micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
                 logFilePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(logFileFullPath)
                 
+                shutil.copy(micrographFullPath, self.allParams[movieNumber]["processDir"])
+                shutil.copy(correctedDoseMicrographFullPath, self.allParams[movieNumber]["processDir"])
+                shutil.copy(logFileFullPath, self.allParams[movieNumber]["processDir"])
                 try:
                     motionCorrectionObject = self.client.service.addMotionCorrection(proposal=self.proposal, 
                                                 movieFullPath=movieFullPath,
@@ -432,7 +442,7 @@ class MonitorISPyB_ESRF(Monitor):
                     spectraImageSnapshotFullPath = dictResults["spectraImageSnapshotFullPath"]
                     spectraImageSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageSnapshotFullPath)
                     spectraImageFullPath = dictResults["spectraImageFullPath"]
-                    spectraImagePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(spectraImageFullPath)
+                    spectraImagePyarchPath = None
                     defocusU = dictResults["Defocus_U"]
                     defocusV = dictResults["Defocus_V"]
                     angle = dictResults["Angle"]
@@ -440,6 +450,8 @@ class MonitorISPyB_ESRF(Monitor):
                     phaseShift = dictResults["Phase_shift"]
                     resolutionLimit = dictResults["resolutionLimit"]
                     estimatedBfactor = dictResults["estimatedBfactor"]
+                    shutil.copy(spectraImageFullPath, self.allParams[movieNumber]["processDir"])
+                    shutil.copy(dictResults["logFilePath"], self.allParams[movieNumber]["processDir"])
                 except:
                     self.info("ERROR uploading CTF for movie {0}".format(movieFullPath))
                     traceback.print_exc()
