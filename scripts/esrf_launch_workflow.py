@@ -29,7 +29,7 @@ import os
 import sys
 import glob
 import time
-import pprint
+import getopt
 import datetime
 import tempfile
 from pyworkflow.manager import Manager
@@ -64,22 +64,70 @@ def getUpdatedProtocol(protocol):
     prot2.closeMappers()
     return prot2
 
-n = len(sys.argv)
 
-if n != 8:
-    usage("Incorrect number of input parameters")
+# Parse command line
+usage = "Usage: esrf_launch_workflow.py --directory <dir> --template <template> [--projectName <name>] -protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose>"    
 
-dataDirectory = sys.argv[1]
-filesPattern = sys.argv[2]
-projName = sys.argv[3]
-proteinAcronym = sys.argv[4]
-sampleAcronym = sys.argv[5]
-doseInitial = float(sys.argv[6])
-dosePerFrame = float(sys.argv[7])
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "template=", "projectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "help"])
+except getopt.GetoptError:
+    print(usage)
+    sys.exit(1)
 
-path = os.path.join(os.environ['SCIPION_HOME'], 'pyworkflow', 'gui', 'no-tkinter')
-sys.path.insert(1, path)
+if len(args) != 0:
+    print(usage)
+    sys.exit(1)
 
+dataDirectory = None
+filesPattern = None
+projectName = None
+proteinAcronym = None
+sampleAcronym = None
+doseInitial = None
+dosePerFrame = None
+dataStreaming = "true"
+
+
+for opt, arg in opts:
+    if opt in ["-h", "--help"]:
+        print(usage)
+        sys.exit()
+    elif opt in ["--directory"]:
+        dataDirectory = arg
+    elif opt in ["--template"]:
+        filesPattern = arg
+    elif opt in ["--projectName"]:
+        projectName = arg
+    elif opt in ["--protein"]:
+        proteinAcronym = arg
+    elif opt in ["--sample"]:
+        sampleAcronym = arg
+    elif opt in ["--doseInitial"]:
+        doseInitial = float(arg)
+    elif opt in ["--dosePerFrame"]:
+        dosePerFrame = float(arg)
+
+# Check mandatory parameters
+if not all([dataDirectory, filesPattern, proteinAcronym, sampleAcronym, doseInitial, dosePerFrame]):
+    print(usage)
+    sys.exit(1)
+
+print("Data directory: {0}".format(dataDirectory))
+print("Template: {0}".format(filesPattern))
+print("Protein acronym: {0}".format(proteinAcronym))
+print("Sample acronym: {0}".format(sampleAcronym))
+print("Dose initial: {0}".format(doseInitial))
+print("Dose per frame: {0}".format(dosePerFrame))
+
+# Check how many movies are present on disk
+listMovies = glob.glob(os.path.join(dataDirectory, filesPattern))
+noMovies = len(listMovies)
+if noMovies == 0:
+    print("ERROR! No movies available in directory {0} with the template {1}.".format(dataDirectory, filesPattern))
+    sys.exit(1)
+else:
+    print("Number of movies available on disk: {0}".format(noMovies))
+    
 # Set up location
 if "RAW_DATA" in dataDirectory:
     location = dataDirectory.replace("RAW_DATA", "PROCESSED_DATA")
@@ -88,23 +136,25 @@ if "RAW_DATA" in dataDirectory:
 else:
     location = tempfile.mkdtemp(prefix="ScipionUserData_")
 
+if projectName is None:
+    if "*" in filesPattern or "?" in filesPattern:
+        projectName = os.path.basename(dataDirectory)
+    else:
+        # Use movie file name as project name
+        projectName = os.path.splitext(filesPattern)[0]
+        location = os.path.join(location, projectName)
+        dataStreaming = "false"
+        
 # All param json file
-allParamsJsonFile = os.path.join(location, "{0}_{1}.json".format(proteinAcronym,sampleAcronym))
-#index = 1
-#while os.path.exists(allParamsJsonFile):
-#    allParamsJsonFile = os.path.join(location, "{0}_{1}_{2}.json".format(proteinAcronym,sampleAcronym, index))
-#    index += 1
+allParamsJsonFile = os.path.join(location, "allParams.json")
 
+print("Scipion project name: {0}".format(projectName))
+print("Scipion user data location: {0}".format(location))
 print("All param json file: {0}".format(allParamsJsonFile))
 
 # Get meta data like phasePlateUsed
 
 doPhaseShiftEstimation = "false"
-listMovies = glob.glob(os.path.join(dataDirectory, filesPattern))
-
-if len(listMovies) == 0:
-    print("ERROR! No movies acqured yet.")
-    sys.exit(1)
 
 firstMovieFullPath = listMovies[0]
 
@@ -122,9 +172,11 @@ else:
     print("Proposal: {0}".format(proposal))
     if proposal == "mx415":
         # Use valid data base
+        print("ISPyB valid data base used")
         db = 1
     else:
         # Use productiond data base
+        print("ISPyB production data base used")
         db = 0
 
 jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(firstMovieFullPath)
@@ -135,6 +187,13 @@ nominalMagnification = int(dictResults["nominalMagnification"])
 superResolutionFactor = int(dictResults["superResolutionFactor"])
 
 samplingRate = 1.1 / float(superResolutionFactor) 
+
+print("doPhaseShiftEstimation: {0}".format(doPhaseShiftEstimation))
+print("nominalMagnification: {0}".format(nominalMagnification))
+print("superResolutionFactor: {0}".format(superResolutionFactor))
+print("samplingRate: {0}".format(samplingRate))
+print("dataStreaming: {0}".format(dataStreaming))
+
 # Create json file
 
 jsonString = """[
@@ -162,7 +221,7 @@ jsonString = """[
         "dosePerFrame": %f,
         "gainFile": null,
         "darkFile": null,
-        "dataStreaming": true,
+        "dataStreaming": %s,
         "timeout": 7200,
         "fileTimeout": 30,
         "inputIndividualFrames": false,
@@ -269,7 +328,7 @@ jsonString = """[
         "allParamsJsonFile": "%s"
     }
 ]""" % (dataDirectory, filesPattern, nominalMagnification, samplingRate, \
-        doseInitial, dosePerFrame, doPhaseShiftEstimation, proposal, \
+        doseInitial, dosePerFrame, dataStreaming, doPhaseShiftEstimation, proposal, \
         proteinAcronym, sampleAcronym, db, allParamsJsonFile)
 
 # Write json file
@@ -283,14 +342,14 @@ print("jsonFile: {0}".format(jsonFile))
 # Create a new project
 manager = Manager()
 
-if manager.hasProject(projName):
+if manager.hasProject(projectName):
     usage("There is already a project with this name: %s"
-          % pwutils.red(projName))
+          % pwutils.red(projectName))
 
 if jsonFile is not None and not os.path.exists(jsonFile):
     usage("Inexistent json file: %s" % pwutils.red(jsonFile))
 
-project = manager.createProject(projName, location=location)
+project = manager.createProject(projectName, location=location)
 
 if jsonFile is not None:
     protDict = project.loadProtocols(jsonFile)
@@ -300,12 +359,12 @@ runs = project.getRuns()
 
 # Now assuming that there is no dependencies between runs
 # and the graph is lineal
-#for prot in runs:
-#    project.scheduleProtocol(prot)
+for prot in runs:
+    project.scheduleProtocol(prot)
 
 
 # Monitor the execution:
-doContinue = False
+doContinue = True
 while doContinue:
     doContinue = False
     updatedRuns = [getUpdatedProtocol(p) for p in runs]
