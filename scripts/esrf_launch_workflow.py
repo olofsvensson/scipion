@@ -37,21 +37,6 @@ import pyworkflow.utils as pwutils
 from pyworkflow.protocol import getProtocolFromDb
 from pyworkflow.em.packages.ispyb.ispyb_esrf_utils import ISPyB_ESRF_Utils
 
-def usage(error):
-    print """
-    ERROR: %s
-
-    Usage: scipion python scripts/esrf_launch_workflow.py
-        dataDirectory="folder" location of raw data (movie files)
-        filesPattern="pattern" template for movie files
-        name="Scipion project name (must be unique)"
-        proteinAcronym="Protein acronym name"
-        sampleAcronym="Sample acronym name"
-        doseInitial="Total dose"
-        dosePerFrame="Dose per frame"
-        This script will create and run a project 
-    """ % error
-    sys.exit(1)
 
 def getUpdatedProtocol(protocol):
     """ Retrieve the updated protocol and close db connections
@@ -66,10 +51,10 @@ def getUpdatedProtocol(protocol):
 
 
 # Parse command line
-usage = "Usage: esrf_launch_workflow.py --directory <dir> --template <template> [--projectName <name>] -protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose>"    
+usage = "Usage: cryoemProcess --directory <dir> --template <template> [--projectName <name>] --protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose> [--pixelSize <pixelSize>]"    
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "template=", "projectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "help"])
+    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "template=", "projectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "samplingRate=", "help"])
 except getopt.GetoptError:
     print(usage)
     sys.exit(1)
@@ -85,6 +70,7 @@ proteinAcronym = None
 sampleAcronym = None
 doseInitial = None
 dosePerFrame = None
+samplingRate = None
 dataStreaming = "true"
 
 
@@ -106,6 +92,8 @@ for opt, arg in opts:
         doseInitial = float(arg)
     elif opt in ["--dosePerFrame"]:
         dosePerFrame = float(arg)
+    elif opt in ["--samplingRate"]:
+        samplingRate = float(arg)
 
 # Check mandatory parameters
 if not all([dataDirectory, filesPattern, proteinAcronym, sampleAcronym, doseInitial, dosePerFrame]):
@@ -186,7 +174,8 @@ doPhaseShiftEstimation = dictResults["phasePlateUsed"]
 nominalMagnification = int(dictResults["nominalMagnification"])
 superResolutionFactor = int(dictResults["superResolutionFactor"])
 
-samplingRate = 1.1 / float(superResolutionFactor) 
+if samplingRate is None:
+    samplingRate = 1.1 / float(superResolutionFactor)
 
 print("doPhaseShiftEstimation: {0}".format(doPhaseShiftEstimation))
 print("nominalMagnification: {0}".format(nominalMagnification))
@@ -222,7 +211,7 @@ jsonString = """[
         "gainFile": null,
         "darkFile": null,
         "dataStreaming": %s,
-        "timeout": 7200,
+        "timeout": 86400,
         "fileTimeout": 30,
         "inputIndividualFrames": false,
         "numberOfIndividualFrames": null,
@@ -241,7 +230,7 @@ jsonString = """[
         "runName": null,
         "runMode": 0,
         "gpuMsg": "True",
-        "GPUIDs": "0",
+        "GPUIDs": "[0,1]",
         "alignFrame0": 1,
         "alignFrameN": 0,
         "useAlignToSum": true,
@@ -320,7 +309,7 @@ jsonString = """[
         "runName": null,
         "runMode": 0,
         "inputProtocols": ["2", "77", "195"],
-        "samplingInterval": 30,
+        "samplingInterval": 10,
         "proposal": "%s",
         "proteinAcronym": "%s",
         "sampleAcronym": "%s",
@@ -343,8 +332,8 @@ print("jsonFile: {0}".format(jsonFile))
 manager = Manager()
 
 if manager.hasProject(projectName):
-    usage("There is already a project with this name: %s"
-          % pwutils.red(projectName))
+    usage("There is already a project with this name: {0}".format(pwutils.red(projectName)))
+    sys.exit(1)
 
 if jsonFile is not None and not os.path.exists(jsonFile):
     usage("Inexistent json file: %s" % pwutils.red(jsonFile))
@@ -374,6 +363,6 @@ while doContinue:
         print("{0} status: {1}".format(prot.getRunName(), prot.getStatusMessage()))
         if prot.isActive():
             doContinue = True
-    time.sleep(15)
+    time.sleep(5)
         
     

@@ -26,7 +26,10 @@
 # *
 # **************************************************************************
 
+import sys
 import datetime
+
+sys.path.insert(0, "/opt/pxsoft/EDNA/vMX/edna/libraries/suds-0.4")
 
 from suds.client import Client
 from suds.transport.http import HttpAuthenticated
@@ -47,20 +50,19 @@ if __name__ == "__main__":
 
 	username = str(credentialsConfig.get('Credential', 'user'))
 	password = str(credentialsConfig.get('Credential', 'password'))
-	url = str(config.get('Connection', 'url'))
+	url = str(config.get('Connection', 'url_1'))
 
 	# Authentication
 	httpAuthenticatedToolsForAutoprocessingWebService = HttpAuthenticated(username = username, password = password ) 
 	client = Client( url, transport = httpAuthenticatedToolsForAutoprocessingWebService, cache = None, timeout = 15 )
 	
 	# Proposal parameters
-	proposalCode = config.get('Proposal', 'type')
-	proposalNumber = config.get('Proposal', 'number')
 
-
+	proposal = "mx415"
+	proteinAcronym="PROTEIN"
 	sampleAcronym = "ACRONYM"
-	movieDirectory = "/data/imageDirectory2"
-	movieFullPath = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
+	movieDirectory = "/data/visitor/mx415/cm01/20171206/RAW_DATA/test2/CWAT_ESRF_RawData_K2/170620_TMV_1/Images-Disc1/GridSquare_20174003/Data"
+	movieFullPath = "/data/visitor/mx415/cm01/20171206/RAW_DATA/test2/CWAT_ESRF_RawData_K2/170620_TMV_1/Images-Disc1/GridSquare_20174003/Data/FoilHole_20182354_Data_20179605_20179606_20171206_1523-1198.mrc"
 	movieNumber = "301"
 	micrographFullPath = "/data/pyarch/fileName.mrc"
 	micrographSnapshotFullPath = "/data/pyarch/fileName.png"
@@ -74,9 +76,12 @@ if __name__ == "__main__":
 	dosePerImage = "1.0"
 	positionX = "101"
 	positionY = "102"
-	beamlineName = "cm01"			
+	beamlineName = "cm01"
+	dateString = "2017-12-06 16:42:30"	
+	gridSquareSnapshotFullPath = "/data/pyarch/fileName.png"
 	if True:								
-		movieObject = client.service.addMovie(proposal=proposalCode+proposalNumber, 
+		movieObject = client.service.addMovie(proposal=proposal, 
+							proteinAcronym=proteinAcronym, 
 							sampleAcronym=sampleAcronym, 
 							movieDirectory=movieDirectory,
 							movieFullPath=movieFullPath,
@@ -94,6 +99,8 @@ if __name__ == "__main__":
 							positionX=positionX,
 							positionY=positionY,
 							beamlineName=beamlineName,
+							gridSquareSnapshotFullPath=gridSquareSnapshotFullPath,
+							startTime=dateString,
 							)
 	
 		print(movieObject)
@@ -111,7 +118,7 @@ if __name__ == "__main__":
 
 	
 	if True:								
-		motionCorrectionObject = client.service.addMotionCorrection(proposal=proposalCode+proposalNumber, 
+		motionCorrectionObject = client.service.addMotionCorrection(proposal=proposal, 
 											movieFullPath=movieFullPath,
 											firstFrame=firstFrame,
 											lastFrame=lastFrame,
@@ -121,8 +128,8 @@ if __name__ == "__main__":
 											averageMotionPerFrame=averageMotionPerFrame,
 											driftPlotFullPath=driftPlotFullPath,
 											micrographFullPath=micrographFullPath,
-											correctedDoseMicrographFullPath=correctedDoseMicrographFullPath,
 											micrographSnapshotFullPath=micrographSnapshotFullPath,
+											correctedDoseMicrographFullPath=correctedDoseMicrographFullPath,
 											logFileFullPath=logFileFullPath)
 		print(motionCorrectionObject)
 		
@@ -137,7 +144,7 @@ if __name__ == "__main__":
 	estimatedBfactor = "5"
 	logFilePath = "/data/pyarch/ctfLogFile.txt"
 	if True:
-		ctfObject = client.service.addCTF(proposal=proposalCode+proposalNumber, 
+		ctfObject = client.service.addCTF(proposal=proposal, 
 							movieFullPath=movieFullPath,
 							spectraImageSnapshotFullPath=spectraImageSnapshotFullPath,
 							spectraImageFullPath=spectraImageFullPath,

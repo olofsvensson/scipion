@@ -116,7 +116,7 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
               
         monitor = MonitorISPyB_ESRF(self, workingDir=self._getPath(),
                                         samplingInterval=self.samplingInterval.get(),
-                                        monitorTime=24*60) # 24 H max monitor time
+                                        monitorTime=4*24*60) # 4*24 H max monitor time
     
         monitor.addNotifier(PrintNotifier())
         monitor.loop()
