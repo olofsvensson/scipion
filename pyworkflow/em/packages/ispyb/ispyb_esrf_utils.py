@@ -288,6 +288,7 @@ class ISPyB_ESRF_Utils(object):
         dictResult["movieNumber"] = m.group(8)   
         dictResult["extra"] = m.group(9)   
         dictResult["suffix"] = m.group(10)   
+        dictResult["movieName"] = "{prefix}_{id1}_Data_{id2}_{id3}_{date}_{hour}-{movieNumber}".format(**dictResult) 
         return dictResult
 
     @ staticmethod

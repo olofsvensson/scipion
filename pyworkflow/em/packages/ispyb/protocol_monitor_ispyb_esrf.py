@@ -225,34 +225,33 @@ class MonitorISPyB_ESRF(Monitor):
 
     def uploadImportMovies(self, prot):
         for movieFullPath in prot.getMatchFiles():
-            listMovieFullPath = [ self.allParams[movieNumber]["movieFullPath"] for movieNumber in self.allParams if "movieFullPath" in self.allParams[movieNumber]]
+            listMovieFullPath = [ self.allParams[movieName]["movieFullPath"] for movieName in self.allParams if "movieFullPath" in self.allParams[movieName]]
             if movieFullPath in listMovieFullPath:
                 pass
                 #self.info("Movie already uploaded: {0}".format(movieFullPath))
             else:                
                 self.info("Import movies: movieFullPath: {0}".format(movieFullPath))
                 # Create "process" directory
-                movieName = os.path.splitext(os.path.basename(movieFullPath))[0]
-                processDir = os.path.join(os.path.dirname(movieFullPath), "process", movieName)     
-                if not os.path.exists(processDir):
-                    os.makedirs(processDir, 0755)     
                 dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
                 self.movieDirectory = dictFileNameParameters["directory"]
                 prefix = dictFileNameParameters["prefix"]   
                 date = dictFileNameParameters["date"]   
                 hour = dictFileNameParameters["hour"]   
                 movieNumber = dictFileNameParameters["movieNumber"]   
+                movieName = dictFileNameParameters["movieName"]
+                self.info("Import movies: movieName: {0}".format(movieName))
+                processDir = os.path.join(os.path.dirname(movieFullPath), "process", movieName)     
+                if not os.path.exists(processDir):
+                    os.makedirs(processDir, 0755)     
                 
                 self.movieDirectory = os.path.dirname(movieFullPath)
                 
                 micrographSnapshotFullPath, micrographFullPath, xmlMetaDataFullPath, gridSquareSnapshotFullPath = \
                    ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
                 
-                time.sleep(1)
                 startTime = time.time()
                 doContinue = True
                 while doContinue:
-                    time.sleep(5)
                     micrographSnapshotFullPath, micrographFullPath, xmlMetaDataFullPath, gridSquareSnapshotFullPath = \
                        ISPyB_ESRF_Utils.getMovieJpegMrcXml(movieFullPath)
                     if micrographSnapshotFullPath is None or micrographFullPath is None or xmlMetaDataFullPath is None or gridSquareSnapshotFullPath is None:
@@ -262,9 +261,10 @@ class MonitorISPyB_ESRF(Monitor):
                         if deltaTime > 30:
                             self.info("Import movies: Timeout waiting for meta-data files to appear on disk!!!")
                             doContinue = False
+                        else:
+                            time.sleep(5)
                     else:
                         doContinue = False                         
-                        time.sleep(1)
     
                 self.info("Import movies: micrographSnapshotFullPath: {0}".format(micrographSnapshotFullPath))
     
@@ -331,7 +331,8 @@ class MonitorISPyB_ESRF(Monitor):
                     self.info("ERROR: movieObject is None!")
                     movieId = None
     
-                self.allParams[movieNumber] = {
+                self.allParams[movieName] = {
+                    "movieNumber": movieNumber,
                     "movieFullPath": movieFullPath,
                     "processDir": processDir,
                     "date": date,   
@@ -341,7 +342,7 @@ class MonitorISPyB_ESRF(Monitor):
                     "dosePerFrame": prot.dosePerFrame.get(),
                     "proposal": self.proposal,
                  }
-                self.info("Import movies done, movieId = {0}".format(self.allParams[movieNumber]["movieId"]))
+                self.info("Import movies done, movieId = {0}".format(self.allParams[movieName]["movieId"]))
 
 
     def uploadAlignMovies(self, prot):
@@ -349,10 +350,10 @@ class MonitorISPyB_ESRF(Monitor):
         for micrograph in self.iter_updated_set(prot.outputMicrographs):
             micrographFullPath = os.path.join(self.currentDir, micrograph.getFileName())
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
-            movieNumber = dictFileNameParameters["movieNumber"]
-            if movieNumber in self.allParams and not "motionCorrectionId" in self.allParams[movieNumber]:
-                self.info("Align movies: movie {0}".format(os.path.basename(self.allParams[movieNumber]["movieFullPath"])))
-                movieFullPath = self.allParams[movieNumber]["movieFullPath"]
+            movieName = dictFileNameParameters["movieName"]
+            if movieName in self.allParams and not "motionCorrectionId" in self.allParams[movieName]:
+                self.info("Align movies: movie {0}".format(os.path.basename(self.allParams[movieName]["movieFullPath"])))
+                movieFullPath = self.allParams[movieName]["movieFullPath"]
                 dictResult = ISPyB_ESRF_Utils.getAlignMoviesPngLogFilePath(micrographFullPath)
                 driftPlotFullPath = dictResult["globalShiftPng"]
                 if "doseWeightMrc" in dictResult:
@@ -374,8 +375,8 @@ class MonitorISPyB_ESRF(Monitor):
                     averageMotionPerFrame = None
                 logFileFullPath = dictResult["logFileFullPath"]
                 firstFrame = 1
-                lastFrame = self.allParams[movieNumber]["imagesCount"]
-                dosePerFrame = self.allParams[movieNumber]["dosePerFrame"]
+                lastFrame = self.allParams[movieName]["imagesCount"]
+                dosePerFrame = self.allParams[movieName]["dosePerFrame"]
                 doseWeight = None
                 driftPlotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(driftPlotFullPath)
                 micrographPyarchPath = None
@@ -383,9 +384,9 @@ class MonitorISPyB_ESRF(Monitor):
                 micrographSnapshotPyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(micrographSnapshotFullPath)
                 logFilePyarchPath = ISPyB_ESRF_Utils.copyToPyarchPath(logFileFullPath)
                 
-                shutil.copy(micrographFullPath, self.allParams[movieNumber]["processDir"])
-                shutil.copy(correctedDoseMicrographFullPath, self.allParams[movieNumber]["processDir"])
-                shutil.copy(logFileFullPath, self.allParams[movieNumber]["processDir"])
+                shutil.copy(micrographFullPath, self.allParams[movieName]["processDir"])
+                shutil.copy(correctedDoseMicrographFullPath, self.allParams[movieName]["processDir"])
+                shutil.copy(logFileFullPath, self.allParams[movieName]["processDir"])
                 try:
                     motionCorrectionObject = self.client.service.addMotionCorrection(proposal=self.proposal, 
                                                 movieFullPath=movieFullPath,
@@ -411,9 +412,9 @@ class MonitorISPyB_ESRF(Monitor):
                     self.info("ERROR: motionCorrectionObject is None!")
                     motionCorrectionId = None
                     
-                self.allParams[movieNumber]["motionCorrectionId"] = motionCorrectionId
-                self.allParams[movieNumber]["totalMotion"] = totalMotion
-                self.allParams[movieNumber]["averageMotionPerFrame"] = averageMotionPerFrame
+                self.allParams[movieName]["motionCorrectionId"] = motionCorrectionId
+                self.allParams[movieName]["totalMotion"] = totalMotion
+                self.allParams[movieName]["averageMotionPerFrame"] = averageMotionPerFrame
                 
                 self.info("Align movies done, motionCorrectionId = {0}".format(motionCorrectionId))
 
@@ -422,10 +423,10 @@ class MonitorISPyB_ESRF(Monitor):
         for ctf in self.iter_updated_set(prot.outputCTF):
             micrographFullPath = ctf.getMicrograph().getFileName()
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
-            movieNumber = dictFileNameParameters["movieNumber"]
-            if movieNumber in self.allParams and not "CTFid" in self.allParams[movieNumber]:
-                self.info("CTF: movie {0}".format(os.path.basename(self.allParams[movieNumber]["movieFullPath"])))
-                movieFullPath = self.allParams[movieNumber]["movieFullPath"]
+            movieName = dictFileNameParameters["movieName"]
+            if movieName in self.allParams and not "CTFid" in self.allParams[movieName]:
+                self.info("CTF: movie {0}".format(os.path.basename(self.allParams[movieName]["movieFullPath"])))
+                movieFullPath = self.allParams[movieName]["movieFullPath"]
                 spectraImageSnapshotFullPath = None
                 spectraImageSnapshotPyarchPath = None
                 spectraImageFullPath = None
@@ -450,8 +451,8 @@ class MonitorISPyB_ESRF(Monitor):
                     phaseShift = dictResults["Phase_shift"]
                     resolutionLimit = dictResults["resolutionLimit"]
                     estimatedBfactor = dictResults["estimatedBfactor"]
-                    shutil.copy(spectraImageFullPath, self.allParams[movieNumber]["processDir"])
-                    shutil.copy(dictResults["logFilePath"], self.allParams[movieNumber]["processDir"])
+                    shutil.copy(spectraImageFullPath, self.allParams[movieName]["processDir"])
+                    shutil.copy(dictResults["logFilePath"], self.allParams[movieName]["processDir"])
                 except:
                     self.info("ERROR uploading CTF for movie {0}".format(movieFullPath))
                     traceback.print_exc()
@@ -481,13 +482,13 @@ class MonitorISPyB_ESRF(Monitor):
                     self.info("ERROR: ctfObject is None!")
                     CTFid = None
                     
-                self.allParams[movieNumber]["CTFid"] = CTFid
-                self.allParams[movieNumber]["phaseShift"] = phaseShift
-                self.allParams[movieNumber]["defocusU"] = defocusU
-                self.allParams[movieNumber]["defocusV"] = defocusV
-                self.allParams[movieNumber]["angle"] = angle
-                self.allParams[movieNumber]["crossCorrelationCoefficient"] = crossCorrelationCoefficient
-                self.allParams[movieNumber]["resolutionLimit"] = resolutionLimit
+                self.allParams[movieName]["CTFid"] = CTFid
+                self.allParams[movieName]["phaseShift"] = phaseShift
+                self.allParams[movieName]["defocusU"] = defocusU
+                self.allParams[movieName]["defocusV"] = defocusV
+                self.allParams[movieName]["angle"] = angle
+                self.allParams[movieName]["crossCorrelationCoefficient"] = crossCorrelationCoefficient
+                self.allParams[movieName]["resolutionLimit"] = resolutionLimit
                 
                 self.info("CTF done, CTFid = {0}".format(CTFid))
 

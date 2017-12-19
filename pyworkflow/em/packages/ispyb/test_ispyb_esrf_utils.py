@@ -32,7 +32,7 @@ from ispyb_esrf_utils import ISPyB_ESRF_Utils
 class Test(unittest.TestCase):
 
 
-    def tes_getMovieFileNameParameters(self):
+    def test_getMovieFileNameParameters(self):
         movieFullPath = "/users/svensson/cryoem/CWAT_ESRF_RawData_K2/170619_bGal1/Images-Disc1/GridSquare_19141127/Data/FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc"
         dictResult = ISPyB_ESRF_Utils.getMovieFileNameParameters(movieFullPath)
         pprint.pprint(dictResult)
@@ -106,7 +106,7 @@ class Test(unittest.TestCase):
         pyarchFilePath = ISPyB_ESRF_Utils.copyToPyarchPath(mrcFilePath)
         print(pyarchFilePath)
 
-    def test_getProposal(self):
+    def tes_getProposal(self):
         movieFilePath = "/data/visitor/mx2001/cm01/20171124/RAW_DATA/Data-hug-grid1/Images-Disc1/GridSquare_24748253/Data/FoilHole_24762814_Data_24757346_24757347_20171126_0223-4929.mrc"
         proposal = ISPyB_ESRF_Utils.getProposal(movieFilePath)
         print(proposal)

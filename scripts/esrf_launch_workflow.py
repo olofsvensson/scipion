@@ -51,10 +51,10 @@ def getUpdatedProtocol(protocol):
 
 
 # Parse command line
-usage = "Usage: cryoemProcess --directory <dir> --template <template> [--projectName <name>] --protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose> [--pixelSize <pixelSize>]"    
+usage = "\nUsage: cryoemProcess --directory <dir> [--filesPattern <filesPattern>] [--projectName <name>] --protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose> [--samplingRate <samplingRate>]\n"    
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "template=", "projectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "samplingRate=", "help"])
+    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "filesPattern=", "projectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "samplingRate=", "help"])
 except getopt.GetoptError:
     print(usage)
     sys.exit(1)
@@ -80,7 +80,7 @@ for opt, arg in opts:
         sys.exit()
     elif opt in ["--directory"]:
         dataDirectory = arg
-    elif opt in ["--template"]:
+    elif opt in ["--filesPattern"]:
         filesPattern = arg
     elif opt in ["--projectName"]:
         projectName = arg
@@ -96,12 +96,15 @@ for opt, arg in opts:
         samplingRate = float(arg)
 
 # Check mandatory parameters
-if not all([dataDirectory, filesPattern, proteinAcronym, sampleAcronym, doseInitial, dosePerFrame]):
+if not all([dataDirectory, proteinAcronym, sampleAcronym, doseInitial, dosePerFrame]):
     print(usage)
     sys.exit(1)
+    
+if filesPattern is None:
+    filesPattern = "Images-Disc1/GridSquare_*/Data/FoilHole_*-*.mrc"
 
 print("Data directory: {0}".format(dataDirectory))
-print("Template: {0}".format(filesPattern))
+print("filesPattern: {0}".format(filesPattern))
 print("Protein acronym: {0}".format(proteinAcronym))
 print("Sample acronym: {0}".format(sampleAcronym))
 print("Dose initial: {0}".format(doseInitial))
@@ -111,7 +114,7 @@ print("Dose per frame: {0}".format(dosePerFrame))
 listMovies = glob.glob(os.path.join(dataDirectory, filesPattern))
 noMovies = len(listMovies)
 if noMovies == 0:
-    print("ERROR! No movies available in directory {0} with the template {1}.".format(dataDirectory, filesPattern))
+    print("ERROR! No movies available in directory {0} with the filesPattern {1}.".format(dataDirectory, filesPattern))
     sys.exit(1)
 else:
     print("Number of movies available on disk: {0}".format(noMovies))
@@ -167,7 +170,13 @@ else:
         print("ISPyB production data base used")
         db = 0
 
+print("First movie full path file: {0}".format(firstMovieFullPath))
+
+
 jpeg, mrc, xml, gridSquareThumbNail =  ISPyB_ESRF_Utils.getMovieJpegMrcXml(firstMovieFullPath)
+
+print("Metadata file: {0}".format(xml))
+
 
 dictResults = ISPyB_ESRF_Utils.getXmlMetaData(xml)
 doPhaseShiftEstimation = dictResults["phasePlateUsed"]
