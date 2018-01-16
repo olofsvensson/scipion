@@ -70,7 +70,8 @@ leads to objective and high-quality results.
         if not self.doContinue:
             args['--healpix_order'] = self.angularSamplingDeg.get()
             args['--offset_range'] = self.offsetSearchRangePix.get()
-            args['--offset_step'] = self.offsetSearchStepPix.get() * 2
+
+            args['--offset_step'] = self.offsetSearchStepPix.get() * self._getSamplingFactor()
             args['--auto_refine'] = ''
             args['--split_random_halves'] = ''
             
@@ -204,7 +205,7 @@ leads to objective and high-quality results.
 
         if self.realignMovieFrames:
             summary.append('\nMovie refinement:')
-            summary.append('    Running average window: %d frames' % self.movieAvgWindow)
+            summary.append('    Running average window: %d frames' % self.movieAvgWindow.get())
             summary.append('    Stddev on the translations: %0.2f px' % self.movieStdTrans)
             if self.movieIncludeRotSearch:
                 summary.append('    Stddev on the rotations: %0.2f deg' % self.movieStdRot)

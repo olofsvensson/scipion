@@ -51,6 +51,8 @@ import xmipp
 
 from viewer_fsc import FscViewer
 from viewer_pdf import PDFReportViewer
+
+# FIXME: Why this monitors are imported here?
 from viewer_monitor_summary import ViewerMonitorSummary
 from protocol.monitors.protocol_monitor_ctf import ProtMonitorCTFViewer
 from protocol.monitors.protocol_monitor_system import ProtMonitorSystemViewer
@@ -66,7 +68,11 @@ class DataView(View):
         self._loadPath(path)
         self._env = kwargs.get('env', {})
         self._viewParams = viewParams
-            
+
+    def getViewParams(self):
+        """ Give access to the viewParams dict. """
+        return self._viewParams
+
     def _loadPath(self, path):
         self._tableName = None
 
@@ -99,7 +105,8 @@ class DataView(View):
         return params
     
     def getShowJWebParams(self):
-    
+
+    # FIXME: Maybe it is time to remove this old commented lines
     #=OLD SHOWJ WEB DOCUMENTATION===============================================
     # Extra parameters can be used to configure table layout and set render function for a column
     # Default layout configuration is set in ColumnLayoutProperties method in layout_configuration.py
@@ -189,7 +196,7 @@ class MicrographsView(ObjectView):
         viewParams = {showj.MODE: showj.MODE_MD,
                       showj.ORDER: labels,
                       showj.VISIBLE: labels,
-                      showj.ZOOM: 100
+                      showj.ZOOM: 50
                       }
 
         if renderLabels:
@@ -208,6 +215,7 @@ class CtfView(ObjectView):
                   '_xmipp_ctfmodel_halfplane', '_micObj.plotGlobal._filename'
                  ]
     EXTRA_LABELS = ['_ctffind4_ctfResolution', '_gctf_ctfResolution',
+                    '_ctffind4_ctfPhaseShift', '_gctf_ctfPhaseShift',
                     '_xmipp_ctfCritFirstZero',
                     ' _xmipp_ctfCritCorr13', '_xmipp_ctfCritFitting',
                     '_xmipp_ctfCritNonAstigmaticValidity',
@@ -223,13 +231,14 @@ class CtfView(ObjectView):
         psdLabels = existingLabels(self.PSD_LABELS)
         extraLabels = existingLabels(self.EXTRA_LABELS)
         labels =  'id enabled %s _defocusU _defocusV ' % psdLabels
-        labels += '_defocusAngle _defocusRatio %s ' % extraLabels
-        labels += '  _micObj._filename'
+        labels += '_defocusAngle _defocusRatio '
+        labels += '_phaseShift _resolution _fitQuality %s ' % extraLabels
+        labels += ' _micObj._filename'
 
         viewParams = {showj.MODE: showj.MODE_MD,
                       showj.ORDER: labels,
                       showj.VISIBLE: labels,
-                      showj.ZOOM: 100
+                      showj.ZOOM: 50
                      }
 
         if psdLabels:
@@ -238,11 +247,18 @@ class CtfView(ObjectView):
         if ctfSet.isStreamOpen():
             viewParams['dont_recalc_ctf'] = ''
 
-        if first.hasAttribute('_ctffind4_ctfResolution'):
+        def _anyAttrStartsBy(obj, prefix):
+            """ Return True if any of the attributes of this object starts
+            by the provided prefix.
+            """
+            return any(attrName.startswith(prefix)
+                       for attrName, _ in obj.getAttributesToStore())
+
+        if _anyAttrStartsBy(first, '_ctffind'):
             import pyworkflow.em.packages.grigoriefflab.viewer as gviewer
             viewParams[showj.OBJCMDS] = "'%s'" % gviewer.OBJCMD_CTFFIND4
 
-        elif first.hasAttribute('_gctf_ctfResolution'):
+        elif _anyAttrStartsBy(first, '_gctf'):
             from pyworkflow.em.packages.gctf.viewer import OBJCMD_GCTF
             viewParams[showj.OBJCMDS] = "'%s'" % OBJCMD_GCTF
 
