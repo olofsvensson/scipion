@@ -346,11 +346,13 @@ class MonitorISPyB_ESRF(Monitor):
 
 
     def uploadAlignMovies(self, prot):
-        self.info("ESRF ISPyB upload ")
+        self.info("ESRF ISPyB upload motion corr results")
         for micrograph in self.iter_updated_set(prot.outputMicrographs):
             micrographFullPath = os.path.join(self.currentDir, micrograph.getFileName())
+            #self.info("Motion corr micrographFullPath: {0}".format(micrographFullPath))
             dictFileNameParameters = ISPyB_ESRF_Utils.getMovieFileNameParameters(micrographFullPath)
             movieName = dictFileNameParameters["movieName"]
+            #self.info("Motion corr movie name: {0}".format(movieName))
             if movieName in self.allParams and not "motionCorrectionId" in self.allParams[movieName]:
                 self.info("Align movies: movie {0}".format(os.path.basename(self.allParams[movieName]["movieFullPath"])))
                 movieFullPath = self.allParams[movieName]["movieFullPath"]
@@ -419,6 +421,7 @@ class MonitorISPyB_ESRF(Monitor):
                 self.info("Align movies done, motionCorrectionId = {0}".format(motionCorrectionId))
 
     def uploadCTFMicrographs(self, prot):
+        self.info("ESRF ISPyB upload CTF results")
         workingDir = os.path.join(self.currentDir, str(prot.workingDir))
         for ctf in self.iter_updated_set(prot.outputCTF):
             micrographFullPath = ctf.getMicrograph().getFileName()
