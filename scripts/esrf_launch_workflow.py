@@ -51,10 +51,10 @@ def getUpdatedProtocol(protocol):
 
 
 # Parse command line
-usage = "\nUsage: cryoemProcess --directory <dir> [--filesPattern <filesPattern>] [--projectName <name>] --protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose> [--samplingRate <samplingRate>]\n"    
+usage = "\nUsage: cryoemProcess --directory <dir> [--filesPattern <filesPattern>] [--scipionProjectName <name>] --protein <name> --sample <name> --doseInitial <dose> --dosePerFrame <dose> [--samplingRate <samplingRate>] [--startMotioncorFrame startFrame] [--endMotioncorFrame endFrame]\n"    
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "filesPattern=", "projectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "samplingRate=", "help"])
+    opts, args = getopt.getopt(sys.argv[1:], "", ["directory=", "filesPattern=", "scipionProjectName=", "protein=", "sample=", "doseInitial=", "dosePerFrame=", "samplingRate=", "startMotioncorFrame=", "endMotioncorFrame=", "help"])
 except getopt.GetoptError:
     print(usage)
     sys.exit(1)
@@ -65,13 +65,15 @@ if len(args) != 0:
 
 dataDirectory = None
 filesPattern = None
-projectName = None
+scipionProjectName = None
 proteinAcronym = None
 sampleAcronym = None
 doseInitial = None
 dosePerFrame = None
 samplingRate = None
 dataStreaming = "true"
+alignFrame0 = 1
+alignFrameN = 0
 
 
 for opt, arg in opts:
@@ -82,8 +84,8 @@ for opt, arg in opts:
         dataDirectory = arg
     elif opt in ["--filesPattern"]:
         filesPattern = arg
-    elif opt in ["--projectName"]:
-        projectName = arg
+    elif opt in ["--scipionProjectName"]:
+        scipionProjectName = arg
     elif opt in ["--protein"]:
         proteinAcronym = arg
     elif opt in ["--sample"]:
@@ -94,6 +96,10 @@ for opt, arg in opts:
         dosePerFrame = float(arg)
     elif opt in ["--samplingRate"]:
         samplingRate = float(arg)
+    elif opt in ["--startMotioncorFrame"]:
+        alignFrame0 = float(arg)
+    elif opt in ["--endMotioncorFrame"]:
+        alignFrameN = float(arg)
 
 # Check mandatory parameters
 if not all([dataDirectory, proteinAcronym, sampleAcronym, doseInitial, dosePerFrame]):
@@ -122,24 +128,30 @@ else:
 # Set up location
 if "RAW_DATA" in dataDirectory:
     location = dataDirectory.replace("RAW_DATA", "PROCESSED_DATA")
-    if not os.path.exists(location):
-        os.makedirs(location, 0755)
+#elif "cm01/inhouse" in dataDirectory:
+#    location = "/users/opcm01/PROCESSED_DATA"
 else:
     location = tempfile.mkdtemp(prefix="ScipionUserData_")
 
-if projectName is None:
+dateTime = time.strftime("%Y%m%d-%H%M%S", time.localtime(time.time()))
+
+if scipionProjectName is None:
     if "*" in filesPattern or "?" in filesPattern:
-        projectName = os.path.basename(dataDirectory)
+        scipionProjectName = "{0}_{1}".format(os.path.basename(dataDirectory), dateTime)
     else:
         # Use movie file name as project name
-        projectName = os.path.splitext(filesPattern)[0]
-        location = os.path.join(location, projectName)
+        scipionProjectName = "{0}_{1}".format(os.path.splitext(filesPattern)[0], dateTime)
         dataStreaming = "false"
+
+if not os.path.exists(location):
+    os.makedirs(location, 0755)
+else:
+    os.chmod(location, 0755)
         
 # All param json file
 allParamsJsonFile = os.path.join(location, "allParams.json")
 
-print("Scipion project name: {0}".format(projectName))
+print("Scipion project name: {0}".format(scipionProjectName))
 print("Scipion user data location: {0}".format(location))
 print("All param json file: {0}".format(allParamsJsonFile))
 
@@ -240,8 +252,8 @@ jsonString = """[
         "runMode": 0,
         "gpuMsg": "True",
         "GPUIDs": "[0,1]",
-        "alignFrame0": 1,
-        "alignFrameN": 0,
+        "alignFrame0": %d,
+        "alignFrameN": %d,
         "useAlignToSum": true,
         "sumFrame0": 1,
         "sumFrameN": 0,
@@ -325,12 +337,13 @@ jsonString = """[
         "db": %d,
         "allParamsJsonFile": "%s"
     }
-]""" % (dataDirectory, filesPattern, nominalMagnification, samplingRate, \
-        doseInitial, dosePerFrame, dataStreaming, doPhaseShiftEstimation, proposal, \
+]""" % (dataDirectory, filesPattern, nominalMagnification, samplingRate,
+        doseInitial, dosePerFrame, dataStreaming, alignFrame0, alignFrameN,  
+        doPhaseShiftEstimation, proposal,
         proteinAcronym, sampleAcronym, db, allParamsJsonFile)
 
 # Write json file
-fd, jsonFile = tempfile.mkstemp(suffix=".json", prefix="scipion_workflow_")
+fd, jsonFile = tempfile.mkstemp(suffix=".json", prefix="scipion_workflow_", dir=location)
 os.write(fd, jsonString)
 os.close(fd)
 os.chmod(jsonFile, 0644)
@@ -340,14 +353,14 @@ print("jsonFile: {0}".format(jsonFile))
 # Create a new project
 manager = Manager()
 
-if manager.hasProject(projectName):
-    usage("There is already a project with this name: {0}".format(pwutils.red(projectName)))
+if manager.hasProject(scipionProjectName):
+    usage("There is already a project with this name: {0}".format(pwutils.red(scipionProjectName)))
     sys.exit(1)
 
 if jsonFile is not None and not os.path.exists(jsonFile):
     usage("Inexistent json file: %s" % pwutils.red(jsonFile))
 
-project = manager.createProject(projectName, location=location)
+project = manager.createProject(scipionProjectName, location=location)
 
 if jsonFile is not None:
     protDict = project.loadProtocols(jsonFile)
