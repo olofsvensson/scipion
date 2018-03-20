@@ -28,6 +28,7 @@
 
 import os
 import re
+import sys
 import glob
 import math
 import time
@@ -35,10 +36,63 @@ import socket
 import shutil
 import pprint
 import traceback
+import ConfigParser
 import xml.etree.ElementTree
 
+sys.path.insert(0, "/opt/pxsoft/EDNA/vMX/edna/libraries/suds-0.4")
+
+from suds.client import Client
+from suds.transport.http import HttpAuthenticated
 
 class ISPyB_ESRF_Utils(object):
+
+
+
+    @staticmethod
+    def getHttpAuthenticated():
+        credentialsConfig = ConfigParser.ConfigParser()
+        credentialsConfig.read(os.path.join(os.path.dirname(__file__), 'credentials.properties'))
+        username = str(credentialsConfig.get('Credential', 'user'))
+        password = str(credentialsConfig.get('Credential', 'password'))
+        return HttpAuthenticated(username = username, password = password )
+    
+    @staticmethod
+    def getUrlBase(dbNumber):
+        config = ConfigParser.ConfigParser()
+        # Configuration files
+        config.read(os.path.join(os.path.dirname(__file__), 'ispyb.properties'))    
+        # URL
+        urlBase = str(config.get('UrlBase', 'url_{0}'.format(dbNumber)))
+        return urlBase
+    
+    @staticmethod
+    def splitProposalInCodeAndNumber(proposal):
+        code = None
+        number = None
+        if proposal.startswith("mx"):
+            code = "mx"
+            number = proposal.split("mx")[1]
+        return code, number
+    
+    @staticmethod
+    def getClient(dbNumber):
+        urlBase = ISPyB_ESRF_Utils.getUrlBase(dbNumber)
+        url = os.path.join(urlBase, "ToolsForEMWebService?wsdl") 
+        # Authentication
+        httpAuthenticated = ISPyB_ESRF_Utils.getHttpAuthenticated()
+        client = Client( url, transport = httpAuthenticated, cache = None, timeout = 15 )
+        return client  
+
+    @staticmethod
+    def updateProposalFromSMIS(dbNumber, proposal):
+        urlBase = ISPyB_ESRF_Utils.getUrlBase(dbNumber)
+        url = os.path.join(urlBase, "UpdateFromSMISWebService?wsdl")
+        # Authentication
+        httpAuthenticated = ISPyB_ESRF_Utils.getHttpAuthenticated()
+        client = Client( url, transport = httpAuthenticated, cache = None, timeout = 15 )
+        code, number = ISPyB_ESRF_Utils.splitProposalInCodeAndNumber(proposal)
+        client.service.updateProposalFromSMIS(code, number)
+ 
 
 
     @staticmethod
@@ -47,8 +101,11 @@ class ISPyB_ESRF_Utils(object):
         listDirectory = movieFilePath.split(os.sep)
         # First check: directory must start with "data":
         if listDirectory[1] == "data":
-            # Then check if second level is "visitor":
-            if listDirectory[2] == "visitor":
+            # Check if ihls2975 - temporary fix
+            if "IH-LS-2975" in movieFilePath:
+                proposal = "ihls2975"
+            # If not check if second level is "visitor":
+            elif listDirectory[2] == "visitor":
                 proposal = listDirectory[3]
             elif listDirectory[3] == "inhouse":
                 proposal = listDirectory[4]
@@ -276,18 +333,20 @@ class ISPyB_ESRF_Utils(object):
         FoilHole_19150795_Data_19148847_19148848_20170619_2101-0344.mrc
         """
         dictResult = {}
-        p = re.compile("^(.*)/(.*)_([0-9]*)_Data_([0-9]*)_([0-9]*)_([0-9]*)_([0-9]*)-([0-9]*)(_?.*)\.(.*)")
+        p = re.compile("^(.*)/(GridSquare_[0-9]*)*(_Data_)*(.*)_([0-9]*)_Data_([0-9]*)_([0-9]*)_([0-9]*)_([0-9]*)-([0-9]*)(_?.*)\.(.*)")
         m = p.match(mrcFilePath)
-        dictResult["directory"] = m.group(1)   
-        dictResult["prefix"] = m.group(2)   
-        dictResult["id1"] = m.group(3)   
-        dictResult["id2"] = m.group(4)   
-        dictResult["id3"] = m.group(5)   
-        dictResult["date"] = m.group(6)   
-        dictResult["hour"] = m.group(7)   
-        dictResult["movieNumber"] = m.group(8)   
-        dictResult["extra"] = m.group(9)   
-        dictResult["suffix"] = m.group(10)   
+        dictResult["directory"] = os.path.dirname(mrcFilePath)
+        dictResult["gridSquare"] = m.group(2)   
+        dictResult["data"] = m.group(3)   
+        dictResult["prefix"] = m.group(4)   
+        dictResult["id1"] = m.group(5)   
+        dictResult["id2"] = m.group(6)   
+        dictResult["id3"] = m.group(7)   
+        dictResult["date"] = m.group(8)   
+        dictResult["hour"] = m.group(9)   
+        dictResult["movieNumber"] = m.group(10)   
+        dictResult["extra"] = m.group(11)   
+        dictResult["suffix"] = m.group(12)   
         dictResult["movieName"] = "{prefix}_{id1}_Data_{id2}_{id3}_{date}_{hour}-{movieNumber}".format(**dictResult) 
         return dictResult
 
@@ -306,9 +365,19 @@ class ISPyB_ESRF_Utils(object):
             secondDirectory = list_directory[ 2 ]
             proposal = None
             beamline = None
-            year = list_directory[ 5 ][0:4]
+            #year = list_directory[ 5 ][0:4]
+            year = "2018"
             
-            if topDirectory == "mntdirect" and secondDirectory == "_data_visitor":
+            # Work around for ihls2975...
+            if list_directory[4] == "IH-LS-2975":
+                year = "2018"
+                beamline = "cm01"
+                proposal = "ihls2975"
+                listOfRemainingDirectories = list_directory[ 5: ]
+                listOfRemainingDirectories.insert(0, list_directory[3])
+              
+            
+            elif topDirectory == "mntdirect" and secondDirectory == "_data_visitor":
                 proposal = list_directory[ 3 ]
                 beamline = list_directory[ 4 ]
                 listOfRemainingDirectories = list_directory[ 5: ]

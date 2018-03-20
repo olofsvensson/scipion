@@ -40,10 +40,6 @@ import traceback
 import collections
 import ConfigParser
 
-sys.path.insert(0, "/opt/pxsoft/EDNA/vMX/edna/libraries/suds-0.4")
-
-from suds.client import Client
-from suds.transport.http import HttpAuthenticated
 
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
@@ -95,24 +91,12 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
 
     #--------------------------- STEPS functions -------------------------------
     def monitorStep(self):
-        config = ConfigParser.ConfigParser()
-        credentialsConfig = ConfigParser.ConfigParser()
-    
-        # Configuration files
-        config.read(os.path.join(os.path.dirname(__file__), 'ispyb.properties'))    
-        credentialsConfig.read(os.path.join(os.path.dirname(__file__), 'credentials.properties'))
-    
-    
-        username = str(credentialsConfig.get('Credential', 'user'))
-        password = str(credentialsConfig.get('Credential', 'password'))
-        url = str(config.get('Connection', 'url_{0}'.format(self.db.get())))
-        self.info("ISPyB URL: {0}".format(url))
-        listEmailReceivers = str(config.get('Email', 'receivers'))
-        emailReplyTo = str(config.get('Email', 'replyTo'))
-    
-        # Authentication
-        httpAuthenticatedToolsForAutoprocessingWebService = HttpAuthenticated(username = username, password = password ) 
-        self.client = Client( url, transport = httpAuthenticatedToolsForAutoprocessingWebService, cache = None, timeout = 15 )  
+
+        dbNumber = self.db.get()
+        self.client = ISPyB_ESRF_Utils.getClient(dbNumber)
+        
+        # Update proposal
+        ISPyB_ESRF_Utils.updateProposalFromSMIS(dbNumber, self.proposal.get())
               
         monitor = MonitorISPyB_ESRF(self, workingDir=self._getPath(),
                                         samplingInterval=self.samplingInterval.get(),
