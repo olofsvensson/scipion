@@ -354,7 +354,7 @@ print("jsonFile: {0}".format(jsonFile))
 manager = Manager()
 
 if manager.hasProject(scipionProjectName):
-    usage("There is already a project with this name: {0}".format(pwutils.red(scipionProjectName)))
+    usage("There is already a project with this name: {0}".format(scipionProjectName))
     sys.exit(1)
 
 if jsonFile is not None and not os.path.exists(jsonFile):
