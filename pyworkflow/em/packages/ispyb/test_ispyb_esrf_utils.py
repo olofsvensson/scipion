@@ -127,12 +127,25 @@ class Test(unittest.TestCase):
         client = ISPyB_ESRF_Utils.getClient(1)
         print(client)        
 
-    def test_updateProposalFromSMIS(self):
+    def tes_updateProposalFromSMIS(self):
+        ISPyB_ESRF_Utils.updateProposalFromSMIS(1, "blc11258")
         ISPyB_ESRF_Utils.updateProposalFromSMIS(1, "mx415")
 
     def test_splitProposalInCodeAndNumber(self):
         self.assertEqual(("mx", "415"), ISPyB_ESRF_Utils.splitProposalInCodeAndNumber("mx415"))
+        self.assertEqual(("blc", "11258"), ISPyB_ESRF_Utils.splitProposalInCodeAndNumber("blc11258"))
 
+    def test_findSessions(self):
+        sessions = ISPyB_ESRF_Utils.findSessions(1, "mx415", "CM01")
+        print(sessions)
+        
+    def tes_findPropsal(self):
+        proposal = ISPyB_ESRF_Utils.findProposal(1, "mx415")
+        print(proposal)
+        
+    def tes_createSession(self):
+        sessions = ISPyB_ESRF_Utils.createSession(1, "mx415", "cm01")
+        print(sessions)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -35,6 +35,7 @@ import time
 import socket
 import shutil
 import pprint
+import datetime
 import traceback
 import ConfigParser
 import xml.etree.ElementTree
@@ -72,6 +73,9 @@ class ISPyB_ESRF_Utils(object):
         if proposal.startswith("mx"):
             code = "mx"
             number = proposal.split("mx")[1]
+        elif proposal.startswith("blc"):
+            code = "blc"
+            number = proposal.split("blc")[1]
         return code, number
     
     @staticmethod
@@ -91,8 +95,66 @@ class ISPyB_ESRF_Utils(object):
         httpAuthenticated = ISPyB_ESRF_Utils.getHttpAuthenticated()
         client = Client( url, transport = httpAuthenticated, cache = None, timeout = 15 )
         code, number = ISPyB_ESRF_Utils.splitProposalInCodeAndNumber(proposal)
-        client.service.updateProposalFromSMIS(code, number)
+        response = client.service.updateProposalFromSMIS(code, number)
+        print(response)
  
+    @staticmethod
+    def findSessions(dbNumber, proposal, beamline):
+        urlBase = ISPyB_ESRF_Utils.getUrlBase(dbNumber)
+        url = os.path.join(urlBase, "ToolsForCollectionWebService?wsdl")
+        print(url)
+        # Authentication
+        httpAuthenticated = ISPyB_ESRF_Utils.getHttpAuthenticated()
+        client = Client( url, transport = httpAuthenticated, cache = None, timeout = 15 )
+        code, number = ISPyB_ESRF_Utils.splitProposalInCodeAndNumber(proposal)
+        print(code, number, beamline)
+        sessions = client.service.findSessionsByProposalAndBeamLine(code, number, beamline)
+        return sessions      
+    
+    @staticmethod
+    def findProposal(dbNumber, proposal):
+        urlBase = ISPyB_ESRF_Utils.getUrlBase(dbNumber)
+        url = os.path.join(urlBase, "ToolsForShippingWebService?wsdl")
+        print(url)
+        # Authentication
+        httpAuthenticated = ISPyB_ESRF_Utils.getHttpAuthenticated()
+        client = Client( url, transport = httpAuthenticated, cache = None, timeout = 15 )
+        code, number = ISPyB_ESRF_Utils.splitProposalInCodeAndNumber(proposal)
+        print(code, number)
+        proposal = client.service.findProposal(code, number)
+        return proposal
+    
+    
+    @staticmethod
+    def createSession(dbNumber, proposal, beamline):
+        sessions = []
+        proposalDict = ISPyB_ESRF_Utils.findProposal(dbNumber, proposal)
+        if "proposalId" in proposalDict:
+            currentTime = datetime.datetime.now()
+            startTime = datetime.datetime.combine(currentTime, datetime.time(0, 0))
+            tomorrow = startTime + datetime.timedelta(days=1)
+            endTime = datetime.datetime.combine(tomorrow, datetime.time(7, 59, 59))
+    
+            # Create a session
+            newSessionDict = {}
+            newSessionDict['proposalId'] = proposalDict["proposalId"]
+            newSessionDict['startDate'] = startTime
+            newSessionDict['endDate'] = endTime
+            newSessionDict['beamlineName'] = beamline.upper()
+            newSessionDict['scheduled'] = 0
+            newSessionDict['nbShifts'] = 3
+            newSessionDict['comments'] = "Session created by Scipion"
+            
+            urlBase = ISPyB_ESRF_Utils.getUrlBase(dbNumber)
+            url = os.path.join(urlBase, "ToolsForCollectionWebService?wsdl")
+            print(url)
+            # Authentication
+            httpAuthenticated = ISPyB_ESRF_Utils.getHttpAuthenticated()
+            client = Client( url, transport = httpAuthenticated, cache = None, timeout = 15 )
+            code, number = ISPyB_ESRF_Utils.splitProposalInCodeAndNumber(proposal)
+            print(code, number, beamline)
+            sessions = client.service.storeOrUpdateSession(newSessionDict)
+        return sessions
 
 
     @staticmethod
