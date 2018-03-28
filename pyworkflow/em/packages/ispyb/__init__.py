@@ -32,4 +32,3 @@ _logo = None
 _references = ['Delageniere2011']
 
 from protocol_monitor_ispyb import ProtMonitorISPyB
-from protocol_monitor_ispyb_esrf import ProtMonitorISPyB_ESRF
