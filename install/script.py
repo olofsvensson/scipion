@@ -433,8 +433,8 @@ env.addPackage('relion', version='1.4f',
 relion_vars = [('FFTW_LIB', SW_LIB),
                ('FFTW_INCLUDE', SW_INC)]
 
-relion2_commands = [('export PATH=/sware/isdd/packages/debian9/gcc-5.4.0/install/bin:$PATH;cmake -DGUI=OFF -DCMAKE_INSTALL_PREFIX=./ .', []),
-                    ('export PATH=/sware/isdd/packages/debian9/gcc-5.4.0/install/bin:$PATH; make -j %d' % env.getProcessors(), ['bin/relion_refine'])]
+relion2_commands = [('cmake -DGUI=OFF -DCMAKE_INSTALL_PREFIX=./ .', []),
+                    ('make -j %d' % env.getProcessors(), ['bin/relion_refine'])]
 
 env.addPackage('relion', version='2.0',
                tar='relion-2.0.4.tgz',
