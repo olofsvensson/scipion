@@ -360,6 +360,7 @@ class MonitorISPyB_ESRF(Monitor):
                 }
                 if not "EM_meta_data" in self.allParams:
                     self.allParams["EM_meta_data"] = {
+                        "EM_directory": prot.filesPath.get(),
                         "EM_protein_acronym": self.proteinAcronym,
                         "EM_voltage": voltage,
                         "EM_magnification": magnification,
