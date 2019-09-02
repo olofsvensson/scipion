@@ -100,7 +100,7 @@ class ProtMonitorISPyB_ESRF(ProtMonitor):
         self.client = UtilsISPyB.getClient(url)
         
         # Update proposal
-        UtilsISPyB.updateProposalFromSMIS(dbNumber, self.proposal.get())
+        # UtilsISPyB.updateProposalFromSMIS(dbNumber, self.proposal.get())
               
         monitor = MonitorISPyB_ESRF(self, workingDir=self._getPath(),
                                         samplingInterval=self.samplingInterval.get(),
