@@ -267,7 +267,7 @@ jsonString = """[
         "runName": null,
         "runMode": 0,
         "gpuMsg": "True",
-        "GPUIDs": "[0,1]",
+        "GPUIDs": "0 1",
         "alignFrame0": %d,
         "alignFrameN": %d,
         "useAlignToSum": true,
