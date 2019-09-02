@@ -203,6 +203,17 @@ else:
 
 jpeg, mrc, xml, gridSquareThumbNail =  UtilsPath.getMovieJpegMrcXml(firstMovieFullPath)
 
+if xml is None:
+    print("*"*80)
+    print("*"*80)
+    print("*"*80)
+    print("Error! Cannot find metadata files in the directory which contains the following movie:")
+    print(firstMovieFullPath)
+    print("*"*80)
+    print("*"*80)
+    print("*"*80)
+    sys.exit(1)
+
 print("Metadata file: {0}".format(xml))
 
 
